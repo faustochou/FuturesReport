@@ -204,6 +204,10 @@
 
       <!-- 历史项目数据库 -->
       <HistoryDatabase />
+
+      <footer class="site-footer">
+        <small>© 2026 Nexora. All rights reserved. 未境 版权所有。 Based on MiroFish, licensed under AGPLv3</small>
+      </footer>
     </div>
   </div>
 </template>
@@ -361,6 +365,19 @@ const startSimulation = () => {
   max-width: 1400px;
   margin: 0 auto;
   padding: 60px 40px;
+}
+
+.site-footer {
+  margin-top: 56px;
+  padding-top: 24px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  color: #888;
+}
+
+.site-footer small {
+  font-size: 0.72rem;
+  line-height: 1.6;
 }
 
 /* Hero 区域 */
@@ -868,6 +885,10 @@ const startSimulation = () => {
   .hero-logo {
     max-width: 200px;
     margin-bottom: 20px;
+  }
+
+  .site-footer {
+    margin-top: 40px;
   }
 }
 </style>

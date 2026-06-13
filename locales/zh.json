@@ -26,8 +26,8 @@
     "files": "个文件"
   },
   "meta": {
-    "title": "MiroFish - 预测万物",
-    "description": "MiroFish - 社交媒体舆论模拟系统"
+    "title": "未来报告 - 预测万物",
+    "description": "未来报告 - 社交媒体舆论模拟系统"
   },
   "nav": {},
   "home": {
@@ -36,7 +36,7 @@
     "heroTitle1": "上传任意报告",
     "heroTitle2": "即刻推演未来",
     "heroDesc": "即使只有一段文字，{brand} 也能基于其中的现实种子，全自动生成与之对应的至多{agentScale}构成的平行世界。通过上帝视角注入变量，在复杂的群体交互中寻找动态环境下的{optimalSolution}",
-    "heroDescBrand": "MiroFish",
+    "heroDescBrand": "未来报告",
     "heroDescAgentScale": "百万级Agent",
     "heroDescOptimalSolution": "\"局部最优解\"",
     "slogan": "让未来在 Agent 群中预演，让决策在百战后胜出",
