@@ -1,0 +1,125 @@
+"""
+Admin account management API.
+"""
+
+import json
+import os
+
+from flask import jsonify, request
+
+from . import admin_bp
+from ..models.user import UserManager
+from ..utils.auth import current_admin, require_admin
+
+
+def _version_history_path() -> str:
+    return os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../version-history.json"))
+
+
+def _runtime_commit() -> str:
+    for key in ("ZEABUR_GIT_COMMIT_SHA", "VERCEL_GIT_COMMIT_SHA", "SOURCE_COMMIT", "GIT_COMMIT_SHA"):
+        value = os.environ.get(key)
+        if value:
+            return value[:7]
+    return "current deployment"
+
+
+@admin_bp.route("/login", methods=["POST"])
+def admin_login():
+    data = request.get_json() or {}
+    user = UserManager.authenticate(
+        username=data.get("username", ""),
+        password=data.get("password", ""),
+    )
+    if not user or user.get("role") != "admin":
+        return jsonify({
+            "success": False,
+            "error": "Invalid admin username or password.",
+        }), 401
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "token": UserManager.issue_admin_token(user["user_id"]),
+            "admin": {
+                "user_id": user["user_id"],
+                "username": user["username"],
+                "role": user.get("role", "admin"),
+            },
+        }
+    })
+
+
+@admin_bp.route("/me", methods=["GET"])
+@require_admin
+def admin_me():
+    return jsonify({
+        "success": True,
+        "data": {
+            "admin": current_admin(),
+        }
+    })
+
+
+@admin_bp.route("/users", methods=["GET"])
+@require_admin
+def list_users():
+    return jsonify({
+        "success": True,
+        "data": {
+            "users": UserManager.list_public_users(),
+            "providers": UserManager.providers(),
+        }
+    })
+
+
+@admin_bp.route("/versions", methods=["GET"])
+@require_admin
+def version_history():
+    path = _version_history_path()
+    if not os.path.exists(path):
+        return jsonify({
+            "success": True,
+            "data": {
+                "versions": [],
+            }
+        })
+
+    with open(path, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    versions = data.get("versions", [])
+    for item in versions:
+        if item.get("commit") == "pending":
+            item["commit"] = _runtime_commit()
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "versions": versions,
+        }
+    })
+
+
+@admin_bp.route("/users/<user_id>", methods=["PUT"])
+@require_admin
+def update_user(user_id: str):
+    data = request.get_json() or {}
+    try:
+        updated = UserManager.update_user(
+            user_id=user_id,
+            username=data.get("username"),
+            password=data.get("password"),
+            llm_config=data.get("llm"),
+        )
+    except ValueError as exc:
+        return jsonify({
+            "success": False,
+            "error": str(exc),
+        }), 400
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "user": UserManager.public_user(updated),
+        }
+    })
