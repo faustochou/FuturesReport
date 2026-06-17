@@ -12,6 +12,13 @@ from openai import OpenAI
 
 from ..config import Config
 
+# Providers whose APIs accept OpenAI-style response_format JSON mode.
+# Providers not listed here (e.g. gemma, nvidia) may reject the parameter,
+# so we skip it and rely on prompt instructions + post-processing instead.
+_JSON_MODE_PROVIDERS = frozenset({
+    "openai", "qwen", "deepseek", "kimi", "glm", "minimax", "mistral",
+})
+
 
 class LLMClient:
     """LLM客户端"""
@@ -140,20 +147,21 @@ class LLMClient:
     ) -> Dict[str, Any]:
         """
         发送聊天请求并返回JSON
-        
+
         Args:
             messages: 消息列表
             temperature: 温度参数
             max_tokens: 最大token数
-            
+
         Returns:
             解析后的JSON对象
         """
+        use_json_mode = self.provider in _JSON_MODE_PROVIDERS
         response = self.chat(
             messages=messages,
             temperature=temperature,
             max_tokens=max_tokens,
-            response_format={"type": "json_object"}
+            response_format={"type": "json_object"} if use_json_mode else None
         )
         # 清理markdown代码块标记
         cleaned_response = response.strip()
