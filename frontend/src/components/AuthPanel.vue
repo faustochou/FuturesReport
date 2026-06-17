@@ -166,6 +166,10 @@ const errorMessage = computed(() => {
 
 const togglePanel = () => {
   open.value = !open.value
+  if (open.value) {
+    localError.value = ''
+    authState.error = ''
+  }
 }
 
 const hydrateLlmForm = () => {

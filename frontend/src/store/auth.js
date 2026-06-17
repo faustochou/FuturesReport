@@ -9,10 +9,28 @@ import {
 } from '../api/auth'
 
 const TOKEN_KEY = 'futures_auth_token'
+const USER_KEY  = 'futures_auth_user'
+
+function loadCachedUser() {
+  try {
+    const raw = localStorage.getItem(USER_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function saveUserCache(user) {
+  if (user) {
+    try { localStorage.setItem(USER_KEY, JSON.stringify(user)) } catch {}
+  } else {
+    localStorage.removeItem(USER_KEY)
+  }
+}
 
 export const authState = reactive({
   token: localStorage.getItem(TOKEN_KEY) || '',
-  user: null,
+  user: loadCachedUser(),
   providers: {},
   loading: false,
   error: ''
@@ -22,32 +40,41 @@ export const hasLlmConfig = () => Boolean(authState.user?.llm_configured)
 
 const setSession = (token, user) => {
   authState.token = token || ''
-  authState.user = user || null
+  authState.user  = user  || null
 
   if (authState.token) {
     localStorage.setItem(TOKEN_KEY, authState.token)
   } else {
     localStorage.removeItem(TOKEN_KEY)
   }
+
+  saveUserCache(authState.user)
 }
 
 export const loadProviders = async () => {
-  const res = await getLlmProviders()
-  authState.providers = res.data?.providers || {}
-  return authState.providers
+  try {
+    const res = await getLlmProviders()
+    authState.providers = res.data?.providers || {}
+    return authState.providers
+  } catch {
+    // Backend temporarily unavailable; keep whatever is already in authState.providers
+    return authState.providers
+  }
 }
 
 export const loadCurrentUser = async () => {
   if (!authState.token) return null
 
   authState.loading = true
-  authState.error = ''
+  authState.error   = ''
   try {
     const res = await getCurrentUser()
     authState.user = res.data?.user || null
+    saveUserCache(authState.user)
     return authState.user
   } catch (error) {
-    // Only clear the session for actual auth failures (401), not transient network issues
+    // Only clear the session for actual auth failures (401), not transient network issues.
+    // A network error while the backend is restarting should not log the user out.
     const status = error.status || error.response?.status
     if (status === 401) {
       setSession('', null)
@@ -61,7 +88,7 @@ export const loadCurrentUser = async () => {
 
 export const login = async ({ username, password }) => {
   authState.loading = true
-  authState.error = ''
+  authState.error   = ''
   try {
     const res = await loginAccount({ username, password })
     setSession(res.data?.token, res.data?.user)
@@ -76,7 +103,7 @@ export const login = async ({ username, password }) => {
 
 export const register = async ({ username, password }) => {
   authState.loading = true
-  authState.error = ''
+  authState.error   = ''
   try {
     const res = await registerAccount({ username, password })
     setSession(res.data?.token, res.data?.user)
@@ -91,10 +118,11 @@ export const register = async ({ username, password }) => {
 
 export const saveLlmConfig = async (payload) => {
   authState.loading = true
-  authState.error = ''
+  authState.error   = ''
   try {
     const res = await updateLlmConfig(payload)
     authState.user = res.data?.user || authState.user
+    saveUserCache(authState.user)
     return authState.user
   } catch (error) {
     authState.error = error.message || 'Failed to save LLM settings.'
