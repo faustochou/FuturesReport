@@ -41,17 +41,16 @@ service.interceptors.response.use(
   },
   error => {
     console.error('Response error:', error)
-    
-    // 处理超时
-    if (error.code === 'ECONNABORTED' && error.message.includes('timeout')) {
-      console.error('Request timeout')
+
+    // Extract server-provided error message when available
+    const serverMessage = error.response?.data?.error || error.response?.data?.message
+    if (serverMessage) {
+      const err = new Error(serverMessage)
+      err.status = error.response.status
+      err.code = error.response.data?.code
+      return Promise.reject(err)
     }
-    
-    // 处理网络错误
-    if (error.message === 'Network Error') {
-      console.error('Network error - please check your connection')
-    }
-    
+
     return Promise.reject(error)
   }
 )

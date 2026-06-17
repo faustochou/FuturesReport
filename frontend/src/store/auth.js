@@ -47,8 +47,12 @@ export const loadCurrentUser = async () => {
     authState.user = res.data?.user || null
     return authState.user
   } catch (error) {
-    setSession('', null)
-    authState.error = error.message || 'Session expired.'
+    // Only clear the session for actual auth failures (401), not transient network issues
+    const status = error.status || error.response?.status
+    if (status === 401) {
+      setSession('', null)
+      authState.error = 'Session expired.'
+    }
     return null
   } finally {
     authState.loading = false
