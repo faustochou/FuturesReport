@@ -14,12 +14,25 @@ for (const path in localeFiles) {
   }
 }
 
-const savedLocale = localStorage.getItem('locale') || 'zh'
+function detectLocale() {
+  const saved = localStorage.getItem('locale')
+  if (saved && messages[saved]) return saved
+
+  const lang = (navigator.languages?.[0] || navigator.language || 'en').toLowerCase()
+
+  if (lang.startsWith('zh-tw') || lang.startsWith('zh-hk') || lang.startsWith('zh-mo')) return 'zh-TW'
+  if (lang.startsWith('zh')) return 'zh'
+  if (lang.startsWith('en')) return 'en'
+
+  return 'en'
+}
+
+const detectedLocale = detectLocale()
 
 const i18n = createI18n({
   legacy: false,
-  locale: savedLocale,
-  fallbackLocale: 'zh',
+  locale: detectedLocale,
+  fallbackLocale: 'en',
   messages
 })
 

@@ -1,10 +1,10 @@
-<div align="center">
+﻿<div align="center">
 
 <img src="./static/image/MiroFish_logo_compressed.jpeg" alt="MiroFish Logo" width="75%"/>
 
 <a href="https://trendshift.io/repositories/16144" target="_blank"><img src="https://trendshift.io/api/badge/repositories/16144" alt="666ghj%2FMiroFish | Trendshift" style="width: 250px; height: 55px;" width="250" height="55"/></a>
 
-简洁通用的群体智能引擎，预测万物
+蝞瘣?黎雿?賢???憸?銝
 </br>
 <em>A Simple and Universal Swarm Intelligence Engine, Predicting Anything</em>
 
@@ -20,179 +20,179 @@
 [![X](https://img.shields.io/badge/X-Follow-000000?style=flat-square&logo=x&logoColor=white)](https://x.com/mirofish_ai)
 [![Instagram](https://img.shields.io/badge/Instagram-Follow-E4405F?style=flat-square&logo=instagram&logoColor=white)](https://www.instagram.com/mirofish_ai/)
 
-[English](./README.md) | [中文文档](./README-ZH.md)
+[English](./README.md) | [銝剜??﹝](./README-ZH.md)
 
 </div>
 
-## ⚡ 项目概述
+## ??憿寧璁膩
 
-**MiroFish** 是一款基于多智能体技术的新一代 AI 预测引擎。通过提取现实世界的种子信息（如突发新闻、政策草案、金融信号），自动构建出高保真的平行数字世界。在此空间内，成千上万个具备独立人格、长期记忆与行为逻辑的智能体进行自由交互与社会演化。你可透过「上帝视角」动态注入变量，精准推演未来走向——**让未来在数字沙盘中预演，助决策在百战模拟后胜出**。
+**MiroFish** ?臭?甈曉鈭??箄雿??舐??唬?隞?AI 憸?撘??????啣?銝???摮縑?荔?憒???颯蝑?獢??縑?瘀?嚗?冽?撱箏擃???撟唾??啣?銝??甇斤征?游?嚗???銝葵?瑕??祉?鈭箸??扇敹?銵蛹?餉???賭?餈??芰鈭支?銝冗隡????舫???撣?閫?釣?亙???蝎曉??冽??芣韏啣???*霈拇?亙?啣?瘝?銝剝?瞍??拙蝑?暹?璅⊥?????*??
 
-> 你只需：上传种子材料（数据分析报告或者有趣的小说故事），并用自然语言描述预测需求</br>
-> MiroFish 将返回：一份详尽的预测报告，以及一个可深度交互的高保真数字世界
+> 雿?嚗?隡?摮????唳???亙???頞??撠秩??嚗?撟嗥?芰霂剛??膩憸??瘙?/br>
+> MiroFish 撠???銝隞質祕撠賜?憸??亙?嚗誑??銝芸瘛勗漲鈭支???靽??啣?銝?
 
-### 我们的愿景
+### ?賑???
 
-MiroFish 致力于打造映射现实的群体智能镜像，通过捕捉个体互动引发的群体涌现，突破传统预测的局限：
+MiroFish ?游?鈭???撠摰?蝢支??箄??嚗???銝芯?鈭撘??黎雿??堆?蝒隡?憸?????
 
-- **于宏观**：我们是决策者的预演实验室，让政策与公关在零风险中试错
-- **于微观**：我们是个人用户的创意沙盘，无论是推演小说结局还是探索脑洞，皆可有趣、好玩、触手可及
+- **鈭?閫?*嚗?隞祆?喟???憸?摰?摰歹?霈拇蝑??砍?券憌銝剛???
+- **鈭凝閫?*嚗?隞祆銝芯犖?冽???????捏?舀瞍?霂渡?撅餈?Ｙ揣??嚗??舀?頞?末?押圻???
 
-从严肃预测到趣味仿真，我们让每一个如果都能看见结果，让预测万物成为可能。
+隞艇??瘚頞?隞輻?嚗?隞祈悟瘥?銝芸???賜?閫???霈拚?瘚??拇?銝箏?賬?
 
-## 🌐 在线体验
+## ?? ?函瑪雿?
 
-欢迎访问在线 Demo 演示环境，体验我们为你准备的一次关于热点舆情事件的推演预测：[mirofish-live-demo](https://666ghj.github.io/mirofish-demo/)
+甈Ｚ?霈輸?函瑪 Demo 瞍內?臬?嚗?撉?隞砌蛹雿?憭?銝甈∪鈭?寡???隞嗥??冽?憸?嚗mirofish-live-demo](https://666ghj.github.io/mirofish-demo/)
 
-## 📸 系统截图
+## ? 蝟餌??芸
 
 <div align="center">
 <table>
 <tr>
-<td><img src="./static/image/Screenshot/运行截图1.png" alt="截图1" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图2.png" alt="截图2" width="100%"/></td>
+<td><img src="./static/image/Screenshot/餈??芸1.png" alt="?芸1" width="100%"/></td>
+<td><img src="./static/image/Screenshot/餈??芸2.png" alt="?芸2" width="100%"/></td>
 </tr>
 <tr>
-<td><img src="./static/image/Screenshot/运行截图3.png" alt="截图3" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图4.png" alt="截图4" width="100%"/></td>
+<td><img src="./static/image/Screenshot/餈??芸3.png" alt="?芸3" width="100%"/></td>
+<td><img src="./static/image/Screenshot/餈??芸4.png" alt="?芸4" width="100%"/></td>
 </tr>
 <tr>
-<td><img src="./static/image/Screenshot/运行截图5.png" alt="截图5" width="100%"/></td>
-<td><img src="./static/image/Screenshot/运行截图6.png" alt="截图6" width="100%"/></td>
+<td><img src="./static/image/Screenshot/餈??芸5.png" alt="?芸5" width="100%"/></td>
+<td><img src="./static/image/Screenshot/餈??芸6.png" alt="?芸6" width="100%"/></td>
 </tr>
 </table>
 </div>
 
-## 🎬 演示视频
+## ? 瞍內閫?
 
-### 1. 武汉大学舆情推演预测 + MiroFish项目讲解
-
-<div align="center">
-<a href="https://www.bilibili.com/video/BV1VYBsBHEMY/" target="_blank"><img src="./static/image/武大模拟演示封面.png" alt="MiroFish Demo Video" width="75%"/></a>
-
-点击图片查看使用微舆BettaFish生成的《武大舆情报告》进行预测的完整演示视频
-</div>
-
-### 2. 《红楼梦》失传结局推演预测
+### 1. 甇行?憭批郎???冽?憸? + MiroFish憿寧霈脰圾
 
 <div align="center">
-<a href="https://www.bilibili.com/video/BV1cPk3BBExq" target="_blank"><img src="./static/image/红楼梦模拟推演封面.jpg" alt="MiroFish Demo Video" width="75%"/></a>
+<a href="https://www.bilibili.com/video/BV1VYBsBHEMY/" target="_blank"><img src="./static/image/甇血之璅⊥?瞍內撠.png" alt="MiroFish Demo Video" width="75%"/></a>
 
-点击图片查看基于《红楼梦》前80回数十万字，MiroFish深度预测失传结局
+?孵?曄??亦?雿輻敺株?BettaFish???郎憭扯????銵?瘚?摰瞍內閫?
 </div>
 
-> **金融方向推演预测**、**时政要闻推演预测**等示例陆续更新中...
+### 2. ?滯璆潭╪?仃隡?撅?冽?憸?
 
-## 🔄 工作流程
+<div align="center">
+<a href="https://www.bilibili.com/video/BV1cPk3BBExq" target="_blank"><img src="./static/image/蝥Ｘ未璇行芋?瞍???jpg" alt="MiroFish Demo Video" width="75%"/></a>
 
-1. **图谱构建**：现实种子提取 & 个体与群体记忆注入 & GraphRAG构建
-2. **环境搭建**：实体关系抽取 & 人设生成 & 环境配置Agent注入仿真参数
-3. **开始模拟**：双平台并行模拟 & 自动解析预测需求 & 动态更新时序记忆
-4. **报告生成**：ReportAgent拥有丰富的工具集与模拟后环境进行深度交互
-5. **深度互动**：与模拟世界中的任意一位进行对话 & 与ReportAgent进行对话
+?孵?曄??亦??箔??滯璆潭╪??80???摮?MiroFish瘛勗漲憸?憭曹?蝏?
+</div>
 
-## 🚀 快速开始
+> **???孵??冽?憸?**??*?嗆閬?冽?憸?**蝑內靘?蝏剜?唬葉...
 
-### 一、源码部署（推荐）
+## ?? 撌乩?瘚?
 
-#### 前置要求
+1. **?曇停?遣**嚗摰?摮???& 銝芯?銝黎雿扇敹釣??& GraphRAG?遣
+2. **?臬??剖遣**嚗?雿蝟餅??& 鈭箄挽?? & ?臬??蔭Agent瘜典隞輻??
+3. **撘憪芋??*嚗?撟喳撟嗉?璅⊥? & ?芸閫??憸??瘙?& ?冽?唳摨扇敹?
+4. **?亙???**嚗eportAgent?交?銝啣??極?琿?銝芋???臬?餈?瘛勗漲鈭支?
+5. **瘛勗漲鈭**嚗?璅⊥?銝?銝剔?隞餅?銝雿?銵笆霂?& 銝eportAgent餈?撖寡?
 
-| 工具 | 版本要求 | 说明 | 安装检查 |
+## ?? 敹恍?憪?
+
+### 銝???蝵莎??刻?嚗?
+
+#### ?蔭閬?
+
+| 撌亙 | ?閬? | 霂湔? | 摰?璉??|
 |------|---------|------|---------|
-| **Node.js** | 18+ | 前端运行环境，包含 npm | `node -v` |
-| **Python** | ≥3.11, ≤3.12 | 后端运行环境 | `python --version` |
-| **uv** | 最新版 | Python 包管理器 | `uv --version` |
+| **Node.js** | 18+ | ?垢餈??臬?嚗???npm | `node -v` |
+| **Python** | ??.11, ??.12 | ?垢餈??臬? | `python --version` |
+| **uv** | ??啁? | Python ?恣? | `uv --version` |
 
-#### 1. 配置环境变量
+#### 1. ?蔭?臬???
 
 ```bash
-# 复制示例配置文件
+# 憭蝷箔??蔭?辣
 cp .env.example .env
 
-# 编辑 .env 文件，填入必要的 API 密钥
+# 蝻? .env ?辣嚗‵?亙?閬? API 撖
 ```
 
-**必需的环境变量：**
+**敹??憓???**
 
 ```env
-# LLM API配置（支持 OpenAI SDK 格式的任意 LLM API）
-# 推荐使用阿里百炼平台qwen-plus模型：https://bailian.console.aliyun.com/
-# 注意消耗较大，可先进行小于40轮的模拟尝试
+# LLM API?蔭嚗??OpenAI SDK ?澆??遙??LLM API嚗?
+# ?刻?雿輻?輸??曄撟喳qwen-plus璅∪?嚗ttps://bailian.console.aliyun.com/
+# 瘜冽?瘨?憭改??臬?餈?撠?40頧桃?璅⊥?撠?
 LLM_API_KEY=your_api_key
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_MODEL_NAME=qwen-plus
 
-# Zep Cloud 配置
-# 每月免费额度即可支撑简单使用：https://app.getzep.com/
+# Zep Cloud ?蔭
+# 瘥??晶憸漲?喳?舀?蝞?蝙?剁?https://app.getzep.com/
 ZEP_API_KEY=your_zep_api_key
 ```
 
-#### 2. 安装依赖
+#### 2. 摰?靘?
 
 ```bash
-# 一键安装所有依赖（根目录 + 前端 + 后端）
+# 銝?桀?鋆???韏??寧敶?+ ?垢 + ?垢嚗?
 npm run setup:all
 ```
 
-或者分步安装：
+??甇亙?鋆?
 
 ```bash
-# 安装 Node 依赖（根目录 + 前端）
+# 摰? Node 靘?嚗?桀? + ?垢嚗?
 npm run setup
 
-# 安装 Python 依赖（后端，自动创建虚拟环境）
+# 摰? Python 靘?嚗?蝡荔??芸?遣???臬?嚗?
 npm run setup:backend
 ```
 
-#### 3. 启动服务
+#### 3. ?臬?
 
 ```bash
-# 同时启动前后端（在项目根目录执行）
+# ??臬??蝡荔??券★?格?桀??扯?嚗?
 npm run dev
 ```
 
-**服务地址：**
-- 前端：`http://localhost:3000`
-- 后端 API：`http://localhost:5001`
+**??啣?嚗?*
+- ?垢嚗http://localhost:3000`
+- ?垢 API嚗http://localhost:5001`
 
-**单独启动：**
+**??臬嚗?*
 
 ```bash
-npm run backend   # 仅启动后端
-npm run frontend  # 仅启动前端
+npm run backend   # 隞?典?蝡?
+npm run frontend  # 隞?典?蝡?
 ```
 
-### 二、Docker 部署
+### 鈭ocker ?函蔡
 
 ```bash
-# 1. 配置环境变量（同源码部署）
+# 1. ?蔭?臬???嚗?皞??函蔡嚗?
 cp .env.example .env
 
-# 2. 拉取镜像并启动
+# 2. ????撟嗅??
 docker compose up -d
 ```
 
-默认会读取根目录下的 `.env`，并映射端口 `3000（前端）/5001（后端）`
+暺恕隡粉??桀?銝? `.env`嚗僎??蝡臬 `3000嚗?蝡荔?/5001嚗?蝡荔?`
 
-> 在 `docker-compose.yml` 中已通过注释提供加速镜像地址，可按需替换
+> ??`docker-compose.yml` 銝剖歇??瘜券???????嚗???踵
 
-## 📬 更多交流
+## ? ?游?鈭斗?
 
 <div align="center">
-<img src="./static/image/QQ群.png" alt="QQ交流群" width="60%"/>
+<img src="./static/image/QQ蝢?png" alt="QQ鈭斗?蝢? width="60%"/>
 </div>
 
 &nbsp;
 
-MiroFish团队长期招募全职/实习，如果你对多Agent应用感兴趣，欢迎投递简历至：**mirofish@shanda.com**
+MiroFish?ａ??踵????刻?/摰?嚗???撖孵?Agent摨?頞??甈Ｚ????嚗?*mirofish@shanda.com**
 
-## 📄 致谢
+## ?? ?渲陝
 
-**MiroFish 得到了盛大集团的战略支持和孵化！**
+**MiroFish 敺鈭?憭折??Ｙ???舀??音??**
 
-MiroFish 的仿真引擎由 **[OASIS](https://github.com/camel-ai/oasis)** 驱动，我们衷心感谢 CAMEL-AI 团队的开源贡献！
+MiroFish ?遛??? **[OASIS](https://github.com/camel-ai/oasis)** 撽勗嚗?隞祈◎敹?靚?CAMEL-AI ?ａ???皞插?殷?
 
-## 📈 项目统计
+## ?? 憿寧蝏恣
 
 <a href="https://www.star-history.com/#666ghj/MiroFish&type=date&legend=top-left">
  <picture>
