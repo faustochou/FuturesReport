@@ -54,10 +54,10 @@
     "step02Desc": "Entity extraction & persona generation & Agent config injection",
     "step03Title": "Simulation",
     "step03Desc": "Dual-platform parallel sim & auto-parse requirements & temporal memory",
-    "step04Title": "Report",
-    "step04Desc": "ReportAgent interacts with the post-simulation environment via rich tools",
+    "step04Title": "Foresight Report",
+    "step04Desc": "Futures Studies powered: STEEP analysis & Causal Layered Analysis (CLA) & multi-scenario planning & emerging issues identification",
     "step05Title": "Interaction",
-    "step05Desc": "Chat with any simulated individual & converse with ReportAgent",
+    "step05Desc": "Engage preferred futures: chat with any simulated Agent & test scenario hypotheses & deepen analysis with ReportAgent",
     "realitySeed": "01 / Reality Seed",
     "supportedFormats": "Formats: PDF, MD, TXT",
     "dragToUpload": "Drag files to upload",
@@ -77,7 +77,7 @@
       "Graph Build",
       "Env Setup",
       "Run Simulation",
-      "Report Generation",
+      "Foresight Report",
       "Deep Interaction"
     ]
   },

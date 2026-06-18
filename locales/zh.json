@@ -54,10 +54,10 @@
     "step02Desc": "实体关系抽取 & 人设生成 & 环境配置Agent注入仿真参数",
     "step03Title": "开始模拟",
     "step03Desc": "双平台并行模拟 & 自动解析预测需求 & 动态更新时序记忆",
-    "step04Title": "报告生成",
-    "step04Desc": "ReportAgent拥有丰富的工具集与模拟后环境进行深度交互",
+    "step04Title": "未来学报告",
+    "step04Desc": "未来学方法论驱动：STEEP分析 & 因果分层分析（CLA）& 多情节规划 & 浮现议题识别",
     "step05Title": "深度互动",
-    "step05Desc": "与模拟世界中的任意一位进行对话 & 与ReportAgent进行对话",
+    "step05Desc": "对话渴望的未来：与任意模拟Agent互动 & 检验情节假设 & 与ReportAgent深化分析",
     "realitySeed": "01 / 现实种子",
     "supportedFormats": "支持格式: PDF, MD, TXT",
     "dragToUpload": "拖拽文件上传",
@@ -77,7 +77,7 @@
       "图谱构建",
       "环境搭建",
       "开始模拟",
-      "报告生成",
+      "未来学报告",
       "深度互动"
     ]
   },

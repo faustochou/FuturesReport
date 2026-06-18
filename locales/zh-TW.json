@@ -54,10 +54,10 @@
     "step02Desc": "實體關係抽取 & 人設生成 & 環境配置Agent注入仿真參數",
     "step03Title": "開始模擬",
     "step03Desc": "雙平台並行模擬 & 自動解析預測需求 & 動態更新時序記憶",
-    "step04Title": "報告生成",
-    "step04Desc": "ReportAgent擁有豐富的工具集與模擬後環境進行深度互動",
+    "step04Title": "未來學報告",
+    "step04Desc": "未來學方法論驅動：STEEP分析 & 因果分層分析（CLA）& 多情節規劃 & 浮現議題識別",
     "step05Title": "深度互動",
-    "step05Desc": "與模擬世界中的任意一位進行對話 & 與ReportAgent進行對話",
+    "step05Desc": "對話渴望的未來：與任意模擬Agent互動 & 檢驗情節假設 & 與ReportAgent深化分析",
     "realitySeed": "01 / 現實種子",
     "supportedFormats": "支援格式: PDF, MD, TXT",
     "dragToUpload": "拖曳檔案上傳",
@@ -77,7 +77,7 @@
       "圖譜構建",
       "環境搭建",
       "開始模擬",
-      "報告生成",
+      "未來學報告",
       "深度互動"
     ]
   },
