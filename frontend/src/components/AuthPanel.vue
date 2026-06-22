@@ -155,7 +155,8 @@ const errorMap = {
   'Session expired.': 'auth.sessionExpired',
   'Login failed.': 'auth.loginFailed',
   'Registration failed.': 'auth.registrationFailed',
-  'Failed to save LLM settings.': 'auth.saveLlmFailed'
+  'Failed to save LLM settings.': 'auth.saveLlmFailed',
+  'BACKEND_UNREACHABLE': 'auth.backendUnreachable'
 }
 const errorMessage = computed(() => {
   const message = localError.value || authState.error

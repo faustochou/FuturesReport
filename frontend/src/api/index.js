@@ -42,6 +42,13 @@ service.interceptors.response.use(
   error => {
     console.error('Response error:', error)
 
+    // Network error (backend not reachable) — surface a clear message
+    if (!error.response) {
+      const err = new Error('BACKEND_UNREACHABLE')
+      err.isNetworkError = true
+      return Promise.reject(err)
+    }
+
     // Extract server-provided error message when available
     const serverMessage = error.response?.data?.error || error.response?.data?.message
     if (serverMessage) {

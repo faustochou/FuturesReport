@@ -24,15 +24,15 @@ from app.config import Config
 
 def main():
     """主函数"""
-    # 验证配置
-    errors = Config.validate()
-    if errors:
-        print("配置错误:")
-        for err in errors:
-            print(f"  - {err}")
-        print("\n请检查 .env 文件中的配置")
-        sys.exit(1)
-    
+    # 验证配置 - 缺失项仅打印警告，不阻止启动
+    # (Zep/LLM 仅在使用相关功能时才需要，auth 和账户管理不依赖这些)
+    warnings = Config.validate()
+    if warnings:
+        print("⚠  配置警告 (以下功能暂不可用，auth/登录不受影响):")
+        for w in warnings:
+            print(f"   - {w}")
+        print("   请在项目根目录创建 .env 文件以启用完整功能\n")
+
     # 创建应用
     app = create_app()
     

@@ -702,6 +702,7 @@
     "unsupportedProvider": "Unsupported LLM provider.",
     "sessionExpired": "Session expired. Please log in again.",
     "loginFailed": "Login failed.",
-    "registrationFailed": "Registration failed."
+    "registrationFailed": "Registration failed.",
+    "backendUnreachable": "Backend service is not running. Please run npm run dev and try again."
   }
 }

@@ -702,6 +702,7 @@
     "unsupportedProvider": "不支援的 LLM 服務商。",
     "sessionExpired": "登入已過期，請重新登入。",
     "loginFailed": "登入失敗。",
-    "registrationFailed": "註冊失敗。"
+    "registrationFailed": "註冊失敗。",
+    "backendUnreachable": "後端服務未啟動，請執行 npm run dev 後重試。"
   }
 }

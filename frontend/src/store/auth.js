@@ -73,8 +73,10 @@ export const loadCurrentUser = async () => {
     saveUserCache(authState.user)
     return authState.user
   } catch (error) {
-    // Only clear the session for actual auth failures (401), not transient network issues.
-    // A network error while the backend is restarting should not log the user out.
+    // Network error: backend is not reachable — keep cached session intact.
+    if (error.isNetworkError) return null
+
+    // Only clear the session for actual auth failures (401).
     const status = error.status || error.response?.status
     if (status === 401) {
       setSession('', null)
