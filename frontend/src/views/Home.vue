@@ -182,7 +182,18 @@
                   rows="6"
                   :disabled="loading"
                 ></textarea>
-                <div class="model-badge">{{ $t('home.engineBadge') }}</div>
+                <select
+                  v-if="isConfigured && availableModels.length > 0"
+                  :value="currentModel"
+                  class="model-select"
+                  :disabled="changingModel"
+                  @change="onModelChange"
+                >
+                  <option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option>
+                </select>
+                <select v-else class="model-select model-select--disabled" disabled>
+                  <option>Nexora AI</option>
+                </select>
               </div>
             </div>
 
@@ -216,6 +227,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
+import { authState, saveLlmConfig } from '../store/auth'
 
 const router = useRouter()
 
@@ -239,6 +251,33 @@ const fileInput = ref(null)
 const canSubmit = computed(() => {
   return formData.value.simulationRequirement.trim() !== '' && files.value.length > 0
 })
+
+// 引擎模型选择器
+const changingModel = ref(false)
+const isConfigured = computed(() => Boolean(authState.user?.llm_configured))
+const availableModels = computed(() => {
+  const provider = authState.user?.llm?.provider
+  const current = authState.user?.llm?.model
+  if (!provider) return []
+  const list = authState.providers[provider]?.models || []
+  if (list.length === 0 && current) return [current]
+  return list
+})
+const currentModel = computed(() => authState.user?.llm?.model || '')
+
+const onModelChange = async (event) => {
+  const newModel = event.target.value
+  const provider = authState.user?.llm?.provider
+  if (!newModel || !provider) return
+  changingModel.value = true
+  try {
+    await saveLlmConfig({ provider, model: newModel })
+  } catch {
+    // authState.user stays as-is on error
+  } finally {
+    changingModel.value = false
+  }
+}
 
 // 触发文件选择
 const triggerFileInput = () => {
@@ -807,13 +846,29 @@ const startSimulation = () => {
   min-height: 150px;
 }
 
-.model-badge {
+.model-select {
   position: absolute;
   bottom: 10px;
   right: 15px;
   font-family: var(--font-mono);
   font-size: 0.7rem;
+  color: #666;
+  background: transparent;
+  border: none;
+  outline: none;
+  cursor: pointer;
+  max-width: 200px;
+}
+.model-select:hover:not(:disabled) {
+  color: #222;
+}
+.model-select--disabled,
+.model-select:disabled {
   color: #AAA;
+  cursor: default;
+  -webkit-appearance: none;
+  appearance: none;
+  pointer-events: none;
 }
 
 .start-engine-btn {
