@@ -27,6 +27,12 @@
             <span>{{ ontologyProgress.message || $t('step1.analyzingDocs') }}</span>
           </div>
 
+          <!-- Error State -->
+          <div v-if="error && !ontologyProgress" class="error-section">
+            <span class="error-icon">⚠</span>
+            <span class="error-msg">{{ error }}</span>
+          </div>
+
           <!-- Detail Overlay -->
           <div v-if="selectedOntologyItem" class="ontology-detail-overlay">
             <div class="detail-header">
@@ -201,7 +207,8 @@ const props = defineProps({
   ontologyProgress: Object,
   buildProgress: Object,
   graphData: Object,
-  systemLogs: { type: Array, default: () => [] }
+  systemLogs: { type: Array, default: () => [] },
+  error: { type: String, default: '' }
 })
 
 defineEmits(['next-step'])
@@ -630,6 +637,29 @@ watch(() => props.systemLogs.length, () => {
   font-size: 12px;
   color: #FF5722;
   margin-bottom: 12px;
+}
+
+.error-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: #FFF5F5;
+  border: 1px solid #FFCCCC;
+  border-radius: 4px;
+  font-size: 12px;
+  color: #C62828;
+  margin-bottom: 12px;
+  word-break: break-word;
+}
+
+.error-icon {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+.error-msg {
+  line-height: 1.5;
 }
 
 .spinner-sm {

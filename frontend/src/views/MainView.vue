@@ -52,7 +52,7 @@
       <!-- Right Panel: Step Components -->
       <div class="panel-wrapper right" :style="rightPanelStyle">
         <!-- Step 1: 图谱构建 -->
-        <Step1GraphBuild 
+        <Step1GraphBuild
           v-if="currentStep === 1"
           :currentPhase="currentPhase"
           :projectData="projectData"
@@ -60,6 +60,7 @@
           :buildProgress="buildProgress"
           :graphData="graphData"
           :systemLogs="systemLogs"
+          :error="error"
           @next-step="handleNextStep"
         />
         <!-- Step 2: 环境搭建 -->
@@ -225,6 +226,8 @@ const handleNewProject = async () => {
     }
   } catch (err) {
     error.value = err.message
+    ontologyProgress.value = null
+    currentPhase.value = -1
     addLog(`Exception in handleNewProject: ${err.message}`)
   } finally {
     loading.value = false
