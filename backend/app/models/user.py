@@ -88,11 +88,10 @@ LLM_PROVIDER_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "label": "MiniMax",
         "base_url": "https://api.minimaxi.chat/v1",
         "models": [
-            "MiniMax-Text-01",
-            "MiniMax-M1-40k",
-            "MiniMax-M2.7",
+            "minimax-m3",
+            "minimax-m2.7",
         ],
-        "default_model": "MiniMax-Text-01",
+        "default_model": "minimax-m3",
     },
     "nvidia": {
         "label": "NVIDIA NIM (Nemotron)",

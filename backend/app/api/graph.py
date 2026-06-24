@@ -16,6 +16,8 @@ from ..services.text_processor import TextProcessor
 from ..utils.file_parser import FileParser
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.auth import get_current_llm_config, require_llm_config
+from ..utils.llm_client import LLMClient
 from ..models.task import TaskManager, TaskStatus
 from ..models.project import ProjectManager, ProjectStatus
 
@@ -120,6 +122,7 @@ def reset_project(project_id: str):
 # ============== 接口1：上传文件并生成本体 ==============
 
 @graph_bp.route('/ontology/generate', methods=['POST'])
+@require_llm_config
 def generate_ontology():
     """
     接口1：上传文件，分析生成本体定义
@@ -214,7 +217,8 @@ def generate_ontology():
         
         # 生成本体
         logger.info("调用 LLM 生成本体定义...")
-        generator = OntologyGenerator()
+        llm_config = get_current_llm_config()
+        generator = OntologyGenerator(LLMClient(**llm_config))
         ontology = generator.generate(
             document_texts=document_texts,
             simulation_requirement=simulation_requirement,
