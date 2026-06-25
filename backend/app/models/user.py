@@ -56,12 +56,12 @@ LLM_PROVIDER_DEFAULTS: Dict[str, Dict[str, Any]] = {
         "label": "DeepSeek",
         "base_url": "https://api.deepseek.com/v1",
         "models": [
+            "deepseek-v4-pro",
+            "deepseek-v4-flash",
             "deepseek-chat",
-            "deepseek-chat-v4-pro",
-            "deepseek-chat-v4-flash",
             "deepseek-reasoner",
         ],
-        "default_model": "deepseek-chat",
+        "default_model": "deepseek-v4-pro",
     },
     "kimi": {
         "label": "Kimi / Moonshot AI",
