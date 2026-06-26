@@ -305,6 +305,7 @@ class OntologyGenerator:
                 entity["description"] = entity["description"][:97] + "..."
         
         # 验证关系类型
+        MAX_SOURCE_TARGETS = 10  # Zep API hard limit per edge type
         for edge in result["edge_types"]:
             # 强制将 edge name 转为 SCREAMING_SNAKE_CASE（Zep API 要求）
             if "name" in edge:
@@ -312,19 +313,29 @@ class OntologyGenerator:
                 edge["name"] = original_name.upper()
                 if edge["name"] != original_name:
                     logger.warning(f"Edge type name '{original_name}' auto-converted to '{edge['name']}'")
+            if "source_targets" not in edge:
+                edge["source_targets"] = []
             # 修正 source_targets 中的实体名称引用，与转换后的 PascalCase 保持一致
-            for st in edge.get("source_targets", []):
+            for st in edge["source_targets"]:
+                # Apply entity_name_map first (catches names that were auto-converted)
                 if st.get("source") in entity_name_map:
                     st["source"] = entity_name_map[st["source"]]
                 if st.get("target") in entity_name_map:
                     st["target"] = entity_name_map[st["target"]]
-            if "source_targets" not in edge:
-                edge["source_targets"] = []
+                # Force PascalCase on any remaining names (Zep rejects non-PascalCase)
+                if st.get("source"):
+                    st["source"] = _to_pascal_case(st["source"])
+                if st.get("target"):
+                    st["target"] = _to_pascal_case(st["target"])
+            # Enforce Zep's hard limit of 10 source_targets per edge type
+            if len(edge["source_targets"]) > MAX_SOURCE_TARGETS:
+                logger.warning(f"Edge '{edge.get('name')}' has {len(edge['source_targets'])} source_targets, truncating to {MAX_SOURCE_TARGETS}")
+                edge["source_targets"] = edge["source_targets"][:MAX_SOURCE_TARGETS]
             if "attributes" not in edge:
                 edge["attributes"] = []
             if len(edge.get("description", "")) > 100:
                 edge["description"] = edge["description"][:97] + "..."
-        
+
         # Zep API 限制：最多 10 个自定义实体类型，最多 10 个自定义边类型
         MAX_ENTITY_TYPES = 10
         MAX_EDGE_TYPES = 10
