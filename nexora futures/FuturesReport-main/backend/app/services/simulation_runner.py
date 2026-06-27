@@ -29,7 +29,7 @@ try:
 except ImportError:
     psutil = None
 
-logger = get_logger('mirofish.simulation_runner')
+logger = get_logger('futuresreport.simulation_runner')
 
 # 标记是否已注册清理函数
 _cleanup_registered = False
