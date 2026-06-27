@@ -1,0 +1,35 @@
+services:
+  futuresreport:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: futuresreport:latest
+    container_name: futuresreport
+    env_file:
+      - .env
+    ports:
+      - "3000:3000"
+      - "5001:5001"
+    restart: unless-stopped
+    volumes:
+      - futuresreport-data:/data
+      - ./backend/uploads:/app/backend/uploads
+    # 低资源 K3s 友好建议：限制容器资源，防止 OOM kill 主进程
+    # 在 Zeabur / k8s 中通过 UI 或 manifest 设置 requests/limits (推荐 1.5-2 CPU, 3.5Gi memory)
+    # deploy:
+    #   resources:
+    #     limits:
+    #       cpus: '1.8'
+    #       memory: 3.5G
+    #     reservations:
+    #       cpus: '0.5'
+    #       memory: 1G
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:5001/health',timeout=5).getcode()==200 else 1)"]
+      interval: 30s
+      timeout: 8s
+      retries: 3
+      start_period: 45s
+
+volumes:
+  futuresreport-data:

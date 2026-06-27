@@ -1,0 +1,82 @@
+# Docker build context exclusions for smaller, faster, reliable Zeabur builds
+
+# Dependencies
+node_modules
+frontend/node_modules
+backend/.venv
+.venv
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+
+# Git
+.git
+.gitignore
+
+# Logs and temp
+*.log
+backend/logs/
+logs/
+*.tmp
+
+# Data and uploads (mounted as volume)
+uploads/
+backend/uploads/
+data/
+
+# Environment
+.env
+.env.*
+*.env
+
+# IDE and editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Large media and junk files (prevent huge build context)
+*.mp4
+*.mov
+*.avi
+*.mkv
+*.webm
+*.mp3
+*.wav
+*.flac
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.webp
+*.psd
+*.prproj
+*.aep
+*.pdf
+*.zip
+*.rar
+*.7z
+*.pptx
+*.docx
+
+# Specific large folders from this workspace
+static/image/
+*Footage*/
+pnpm-store/
+Auto-Empirical-Research-Skills-main/
+BaiduNetdiskDownload/
+
+# Build artifacts
+dist/
+build/
+frontend/dist/
+
+# Misc
+.DS_Store
+Thumbs.db
+$RECYCLE.BIN/
