@@ -30,6 +30,18 @@ services:
       timeout: 8s
       retries: 3
       start_period: 45s
+    # For Celery background queue (add Redis service in production Zeabur)
+    # environment:
+    #   - REDIS_URL=redis://redis:6379/0
+    # depends_on:
+    #   - redis
+
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   volumes:
+  #     - redis-data:/data
 
 volumes:
   futuresreport-data:
+  # redis-data:

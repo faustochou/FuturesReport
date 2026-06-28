@@ -35,3 +35,7 @@ python-dotenv>=1.0.0
 pydantic>=2.0.0
 # Monitoring for resource usage on low-RAM deploys (K3s/Zeabur)
 psutil>=5.9.0
+
+# Background task queue for heavy simulation (Celery + Redis)
+celery[redis]>=5.3.0
+redis>=5.0.0

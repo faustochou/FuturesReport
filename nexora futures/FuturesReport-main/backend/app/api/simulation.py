@@ -17,6 +17,9 @@ from ..utils.auth import get_current_llm_config, require_auth, require_llm_confi
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
 from ..models.project import ProjectManager
+from ..models.job import JobManager, JobStatus
+from ..tasks.simulation_tasks import prepare_simulation_task, run_simulation_task
+from ..celery_app import celery
 
 logger = get_logger('futuresreport.api.simulation')
 
@@ -1790,6 +1793,29 @@ def get_run_status(simulation_id: str):
             "traceback": traceback.format_exc()
         }), 500
 
+
+@simulation_bp.route('/job/<job_id>/status', methods=['GET'])
+def get_job_status(job_id: str):
+    """Poll job status for background task progress and resume support."""
+    job = JobManager.get_job(job_id)
+    if not job:
+        return jsonify({"success": False, "error": "Job not found"}), 404
+    
+    # Also merge simulation run_state if applicable
+    sim_data = {}
+    if job.metadata.get("simulation_id"):
+        run_state = SimulationRunner.get_run_state(job.metadata["simulation_id"])
+        if run_state:
+            sim_data = run_state.to_dict()
+    
+    return jsonify({
+        "success": True,
+        "data": {
+            "job": job.to_dict(),
+            "simulation": sim_data,
+            "can_resume": job.status in (JobStatus.FAILED, JobStatus.PROCESSING) and job.checkpoint_data.get("stage") != "completed"
+        }
+    })
 
 @simulation_bp.route('/<simulation_id>/run-status/detail', methods=['GET'])
 def get_run_status_detail(simulation_id: str):

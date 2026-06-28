@@ -307,14 +307,23 @@ class SimulationManager:
                 enrich_with_edges=True
             )
             
+            from ..config import Config
+            entities_list = list(filtered.entities)
+            if len(entities_list) > Config.SIM_MAX_AGENTS:
+                logger.warning(f"Agent count {len(entities_list)} > SIM_MAX_AGENTS={Config.SIM_MAX_AGENTS}. Capping to limit for low-resource safety.")
+                entities_list = entities_list[:Config.SIM_MAX_AGENTS]
+            
+            # Create a lightweight filtered object for downstream
+            class _CappedFiltered:
+                def __init__(self, ents, etypes, fcount):
+                    self.entities = ents
+                    self.entity_types = etypes
+                    self.filtered_count = fcount
+            filtered = _CappedFiltered(entities_list, filtered.entity_types, len(entities_list))
+            
             state.entities_count = filtered.filtered_count
             state.entity_types = list(filtered.entity_types)
             state.agent_count = filtered.filtered_count
-            
-            # 低资源保护：超过上限给出警告（不硬截断，允许但提示）
-            from ..config import Config
-            if filtered.filtered_count > Config.SIM_MAX_AGENTS:
-                logger.warning(f"Agent count {filtered.filtered_count} > SIM_MAX_AGENTS={Config.SIM_MAX_AGENTS}. Consider smaller graph or custom max.")
             
             if progress_callback:
                 progress_callback(
