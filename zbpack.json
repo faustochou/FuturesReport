@@ -1,0 +1,6 @@
+{
+  "dockerfile": {
+    "path": "Dockerfile"
+  },
+  "notes": "For Zeabur K3s low-spec (2vCPU/4GB): set resource limits in dashboard; use SIM_MAX_AGENTS=60 LLM_CONCURRENCY_LIMIT=6 SIM_MAX_ROUNDS=15 for safe dual-sim runs. Healthcheck at /health."
+}

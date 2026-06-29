@@ -1,0 +1,106 @@
+{
+  "versions": [
+    {
+      "version": "2026-06-12.4",
+      "commit": "pending",
+      "date": "2026-06-12",
+      "title": "Persist account login data",
+      "summary": "Stores user accounts in a persistent /data directory and migrates legacy account data when available, preventing users from being forced to register again after redeploys.",
+      "added": [
+        "Persistent USER_DATA_DIR support",
+        "Legacy users.json migration into the persistent data file",
+        "Docker /data volume declaration"
+      ],
+      "modified": [
+        "User account storage now defaults to /data in Docker deployments",
+        "Docker Compose now includes a named persistent data volume"
+      ],
+      "deleted": []
+    },
+    {
+      "version": "2026-06-12.3",
+      "commit": "9cbf633",
+      "date": "2026-06-12",
+      "title": "Add admin-visible version history",
+      "summary": "Adds a version management section inside the admin console so admins can review what changed in each deployed update.",
+      "added": [
+        "version-history.json changelog source",
+        "Admin API endpoint for version history",
+        "Admin console version history panel"
+      ],
+      "modified": [
+        "Admin console now loads users and version history after authentication"
+      ],
+      "deleted": []
+    },
+    {
+      "version": "2026-06-12.2",
+      "commit": "d94fc82",
+      "date": "2026-06-12",
+      "title": "Assign first user as admin and resize logo",
+      "summary": "The first registered account is now the admin account, later registrations are normal users, and the header logo is resized to avoid cropping.",
+      "added": [
+        "Admin role on the first registered user",
+        "Admin console shortcut for admin users"
+      ],
+      "modified": [
+        "Header brand logo sizing",
+        "Admin login now uses the first registered account",
+        "Existing users are normalized so only the first account is admin"
+      ],
+      "deleted": [
+        "ADMIN_USERNAME and ADMIN_PASSWORD requirement"
+      ]
+    },
+    {
+      "version": "2026-06-12.1",
+      "commit": "70bd007",
+      "date": "2026-06-12",
+      "title": "Add admin console and auth modal",
+      "summary": "Adds the admin console, user list editing, LLM settings management, and moves login/register into a modal beside the language switcher.",
+      "added": [
+        "Admin console route at /admin",
+        "Admin user list and edit UI",
+        "Admin API for users",
+        "Auth modal opened from the fixed top-right login button"
+      ],
+      "modified": [
+        "Global language and login controls",
+        "Authentication panel layout"
+      ],
+      "deleted": [
+        "Duplicate per-page language switchers"
+      ]
+    },
+    {
+      "version": "2026-06-11.2",
+      "commit": "552106d",
+      "date": "2026-06-11",
+      "title": "Force Zeabur to build local Docker image",
+      "summary": "Makes Zeabur build from this repository instead of relying on the old upstream image.",
+      "added": [
+        "zbpack.json pointing to the root Dockerfile"
+      ],
+      "modified": [
+        "docker-compose now builds the local image"
+      ],
+      "deleted": [
+        "Old upstream Docker image reference removed in favor of local build"
+      ]
+    },
+    {
+      "version": "2026-06-11.1",
+      "commit": "1708630",
+      "date": "2026-06-11",
+      "title": "Fix Zeabur dependency installation",
+      "summary": "Fixes deployment dependency installation so Zeabur can run the Vite frontend and backend together.",
+      "added": [
+        "Production dependency entry for concurrently"
+      ],
+      "modified": [
+        "Dockerfile installs required dev tooling for the runtime dev server"
+      ],
+      "deleted": []
+    }
+  ]
+}

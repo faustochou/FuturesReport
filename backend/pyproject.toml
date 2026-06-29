@@ -1,0 +1,66 @@
+[project]
+name = "futuresreport-backend"
+version = "0.1.0"
+description = "FuturesReport - 未來學 AI 多智能體模擬引擎"
+requires-python = ">=3.11,<3.13"
+license = { text = "AGPL-3.0" }
+authors = [
+    { name = "Nexora" }
+]
+
+dependencies = [
+    # 核心框架
+    "flask>=3.0.0",
+    "flask-cors>=6.0.0",
+
+    # 数据库
+    "sqlalchemy>=2.0.0",
+    "alembic>=1.13.0",
+    # PostgreSQL driver (production); also usable for dev if Postgres is available
+    "psycopg2-binary>=2.9.0",
+
+    # LLM 相关
+    "openai>=1.0.0",
+
+    # Zep Cloud
+    "zep-cloud==3.13.0",
+
+    # OASIS 社交媒体模拟
+    "camel-oasis==0.2.5",
+    "camel-ai==0.2.78",
+
+    # 文件处理
+    "PyMuPDF>=1.24.0",
+    # 编码检测（支持非UTF-8编码的文本文件）
+    "charset-normalizer>=3.0.0",
+    "chardet>=5.0.0",
+
+    # 工具库
+    "python-dotenv>=1.0.0",
+    "pydantic>=2.0.0",
+    # 低资源监控 (K3s/Zeabur)
+    "psutil>=5.9.0",
+    # Background task queue (Celery + Redis) for moving heavy simulation out of main API
+    "celery[redis]>=5.3.0",
+    "redis>=5.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+    "pipreqs>=0.5.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0.0",
+    "pytest-asyncio>=0.23.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
