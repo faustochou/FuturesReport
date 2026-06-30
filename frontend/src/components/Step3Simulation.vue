@@ -816,10 +816,6 @@ onUnmounted(() => {
 .mini-btn { font-size:11px; padding:2px 6px; margin-left:4px; border:1px solid #ccc; border-radius:2px; background:#fff; cursor:pointer; }
 .mini-btn.danger { border-color:#f66; color:#c00; }
 .progress-mini { margin-left: 10px; color: #555; font-family: monospace; }
-  background: #FFFFFF;
-  font-family: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
-  overflow: hidden;
-}
 
 /* --- Control Bar --- */
 .control-bar {
