@@ -24,27 +24,82 @@ from .zep_entity_reader import EntityNode, ZepEntityReader
 
 logger = get_logger('futuresreport.simulation_config')
 
-# 中国作息时间配置（北京时间）
-CHINA_TIMEZONE_CONFIG = {
-    # 深夜时段（几乎无人活动）
-    "dead_hours": [0, 1, 2, 3, 4, 5],
-    # 早间时段（逐渐醒来）
-    "morning_hours": [6, 7, 8],
-    # 工作时段
-    "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-    # 晚间高峰（最活跃）
-    "peak_hours": [19, 20, 21, 22],
-    # 夜间时段（活跃度下降）
-    "night_hours": [23],
-    # 活跃度系数
-    "activity_multipliers": {
-        "dead": 0.05,      # 凌晨几乎无人
-        "morning": 0.4,    # 早间逐渐活跃
-        "work": 0.7,       # 工作时段中等
-        "peak": 1.5,       # 晚间高峰
-        "night": 0.5       # 深夜下降
-    }
+# 各地区作息时间配置
+REGION_TIMEZONE_CONFIGS = {
+    "china": {
+        "dead_hours": [0, 1, 2, 3, 4, 5],
+        "morning_hours": [6, 7, 8],
+        "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+        "peak_hours": [19, 20, 21, 22],
+        "night_hours": [23],
+        "activity_multipliers": {
+            "dead": 0.05, "morning": 0.4, "work": 0.7, "peak": 1.5, "night": 0.5
+        }
+    },
+    "taiwan": {
+        "dead_hours": [0, 1, 2, 3, 4],
+        "morning_hours": [5, 6, 7, 8],
+        "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+        "peak_hours": [19, 20, 21, 22, 23],
+        "night_hours": [],
+        "activity_multipliers": {
+            "dead": 0.05, "morning": 0.35, "work": 0.7, "peak": 1.5, "night": 0.6
+        }
+    },
+    "usa_et": {
+        "dead_hours": [0, 1, 2, 3, 4, 5],
+        "morning_hours": [6, 7, 8],
+        "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17],
+        "peak_hours": [18, 19, 20, 21],
+        "night_hours": [22, 23],
+        "activity_multipliers": {
+            "dead": 0.05, "morning": 0.45, "work": 0.75, "peak": 1.5, "night": 0.4
+        }
+    },
+    "usa_pt": {
+        "dead_hours": [0, 1, 2, 3, 4, 5],
+        "morning_hours": [6, 7, 8],
+        "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17],
+        "peak_hours": [18, 19, 20, 21, 22],
+        "night_hours": [23],
+        "activity_multipliers": {
+            "dead": 0.05, "morning": 0.4, "work": 0.75, "peak": 1.5, "night": 0.45
+        }
+    },
+    "japan": {
+        "dead_hours": [0, 1, 2, 3, 4, 5],
+        "morning_hours": [6, 7, 8],
+        "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
+        "peak_hours": [19, 20, 21, 22],
+        "night_hours": [23],
+        "activity_multipliers": {
+            "dead": 0.05, "morning": 0.5, "work": 0.8, "peak": 1.4, "night": 0.4
+        }
+    },
+    "europe_ce": {
+        "dead_hours": [0, 1, 2, 3, 4, 5],
+        "morning_hours": [6, 7, 8],
+        "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17],
+        "peak_hours": [18, 19, 20, 21],
+        "night_hours": [22, 23],
+        "activity_multipliers": {
+            "dead": 0.05, "morning": 0.4, "work": 0.75, "peak": 1.4, "night": 0.35
+        }
+    },
+    "global_generic": {
+        "dead_hours": [0, 1, 2, 3, 4],
+        "morning_hours": [5, 6, 7, 8],
+        "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17],
+        "peak_hours": [18, 19, 20, 21],
+        "night_hours": [22, 23],
+        "activity_multipliers": {
+            "dead": 0.1, "morning": 0.45, "work": 0.75, "peak": 1.3, "night": 0.5
+        }
+    },
 }
+
+# 向後兼容別名
+CHINA_TIMEZONE_CONFIG = REGION_TIMEZONE_CONFIGS["china"]
 
 
 @dataclass
@@ -254,6 +309,7 @@ class SimulationConfigGenerator:
         enable_twitter: bool = True,
         enable_reddit: bool = True,
         progress_callback: Optional[Callable[[int, int, str], None]] = None,
+        region_code: str = "china",
     ) -> SimulationParameters:
         """
         智能生成完整的模拟配置（分步生成）
@@ -298,7 +354,7 @@ class SimulationConfigGenerator:
         # ========== 步骤1: 生成时间配置 ==========
         report_progress(1, t('progress.generatingTimeConfig'))
         num_entities = len(entities)
-        time_config_result = self._generate_time_config(context, num_entities)
+        time_config_result = self._generate_time_config(context, num_entities, region_code=region_code)
         time_config = self._parse_time_config(time_config_result, num_entities)
         reasoning_parts.append(f"{t('progress.timeConfigLabel')}: {time_config_result.get('reasoning', t('common.success'))}")
         
@@ -526,30 +582,41 @@ class SimulationConfigGenerator:
         
         return None
     
-    def _generate_time_config(self, context: str, num_entities: int) -> Dict[str, Any]:
+    def _generate_time_config(self, context: str, num_entities: int, region_code: str = "china") -> Dict[str, Any]:
         """生成时间配置"""
         # 使用配置的上下文截断长度
         context_truncated = context[:self.TIME_CONFIG_CONTEXT_LENGTH]
-        
+
         # 计算最大允许值（80%的agent数）
         max_agents_allowed = max(1, int(num_entities * 0.9))
-        
+
+        # 取出该地区的参考作息数据
+        region_cfg = REGION_TIMEZONE_CONFIGS.get(region_code, REGION_TIMEZONE_CONFIGS["china"])
+        region_hint = (
+            f"目标受众地区: {region_code}. "
+            f"参考作息: 低谷时段={region_cfg['dead_hours']}, "
+            f"早间={region_cfg['morning_hours']}, "
+            f"工作时段={region_cfg['work_hours']}, "
+            f"高峰={region_cfg['peak_hours']}."
+        )
+
         prompt = f"""基于以下模拟需求，生成时间模拟配置。
 
 {context_truncated}
 
+## 地区作息参考（请优先依照此地区的作息习惯来调整时段）
+{region_hint}
+
 ## 任务
 请生成时间配置JSON。
 
-### 基本原则（仅供参考，需根据具体事件和参与群体灵活调整）：
-- 请根据模拟场景推断目标用户群体所在时区和作息习惯，以下为东八区(UTC+8)的参考示例
-- 凌晨0-5点几乎无人活动（活跃度系数0.05）
-- 早上6-8点逐渐活跃（活跃度系数0.4）
-- 工作时间9-18点中等活跃（活跃度系数0.7）
-- 晚间19-22点是高峰期（活跃度系数1.5）
-- 23点后活跃度下降（活跃度系数0.5）
-- 一般规律：凌晨低活跃、早间渐增、工作时段中等、晚间高峰
-- **重要**：以下示例值仅供参考，你需要根据事件性质、参与群体特点来调整具体时段
+### 基本原则（需根据具体事件和上方地区作息参考灵活调整）：
+- 凌晨低谷时段几乎无人活动（活跃度系数约0.05）
+- 早间时段逐渐活跃（活跃度系数约0.4）
+- 工作时段中等活跃（活跃度系数约0.7）
+- 晚间高峰最活跃（活跃度系数约1.5）
+- 深夜后活跃度下降
+- **重要**：以下示例值仅供参考，需根据事件性质、参与群体特点来调整具体时段
   - 例如：学生群体高峰可能是21-23点；媒体全天活跃；官方机构只在工作时间
   - 例如：突发热点可能导致深夜也有讨论，off_peak_hours 可适当缩短
 
@@ -585,21 +652,27 @@ class SimulationConfigGenerator:
         try:
             return self._call_llm_with_retry(prompt, system_prompt)
         except Exception as e:
-            logger.warning(f"时间配置LLM生成失败: {e}, 使用默认配置")
-            return self._get_default_time_config(num_entities)
+            logger.warning(f"时间配置LLM生成失败: {e}, 使用默认配置 (region={region_code})")
+            return self._get_default_time_config(num_entities, region_code=region_code)
     
-    def _get_default_time_config(self, num_entities: int) -> Dict[str, Any]:
-        """获取默认时间配置（中国人作息）"""
+    def _get_default_time_config(self, num_entities: int, region_code: str = "china") -> Dict[str, Any]:
+        """获取默认时间配置（依照地区作息）"""
+        cfg = REGION_TIMEZONE_CONFIGS.get(region_code)
+        if not cfg:
+            logger.warning(f"未知地区代码 '{region_code}'，使用 'china' 作为 fallback")
+            cfg = REGION_TIMEZONE_CONFIGS["china"]
+            region_code = "china"
         return {
             "total_simulation_hours": 72,
-            "minutes_per_round": 60,  # 每轮1小时，加快时间流速
+            "minutes_per_round": 60,
             "agents_per_hour_min": max(1, num_entities // 15),
             "agents_per_hour_max": max(5, num_entities // 5),
-            "peak_hours": [19, 20, 21, 22],
-            "off_peak_hours": [0, 1, 2, 3, 4, 5],
-            "morning_hours": [6, 7, 8],
-            "work_hours": [9, 10, 11, 12, 13, 14, 15, 16, 17, 18],
-            "reasoning": "使用默认中国人作息配置（每轮1小时）"
+            "peak_hours": cfg["peak_hours"],
+            "off_peak_hours": cfg["dead_hours"],
+            "morning_hours": cfg["morning_hours"],
+            "work_hours": cfg["work_hours"],
+            "region_code": region_code,
+            "reasoning": f"使用 {region_code} 地區的預設作息設定（每輪1小時）"
         }
     
     def _parse_time_config(self, result: Dict[str, Any], num_entities: int) -> TimeSimulationConfig:

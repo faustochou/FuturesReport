@@ -16,7 +16,7 @@
     "node": ">=18.0.0"
   },
   "license": "AGPL-3.0",
-  "dependencies": {
-    "concurrently": "^9.2.1"
+  "devDependencies": {
+    "concurrently": "^10.0.3"
   }
 }

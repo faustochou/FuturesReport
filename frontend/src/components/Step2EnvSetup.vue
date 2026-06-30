@@ -1,6 +1,28 @@
 <template>
   <div class="env-setup-panel">
     <div class="scroll-container">
+      <!-- 地区作息选择（在准备流程启动前显示） -->
+      <div class="preflight-card" v-if="phase === -1">
+        <div class="preflight-header">
+          <span class="preflight-title">{{ $t('step2.regionLabel') }}</span>
+        </div>
+        <div class="preflight-body">
+          <select class="region-select" v-model="regionCode">
+            <option value="taiwan">{{ $t('step2.regionTaiwan') }}</option>
+            <option value="china">{{ $t('step2.regionChina') }}</option>
+            <option value="japan">{{ $t('step2.regionJapan') }}</option>
+            <option value="usa_et">{{ $t('step2.regionUsaEt') }}</option>
+            <option value="usa_pt">{{ $t('step2.regionUsaPt') }}</option>
+            <option value="europe_ce">{{ $t('step2.regionEuropeCe') }}</option>
+            <option value="global_generic">{{ $t('step2.regionGlobal') }}</option>
+          </select>
+          <p class="region-hint">{{ $t('step2.regionHint') }}</p>
+          <button class="action-btn primary start-setup-btn" @click="handleStartSetup">
+            {{ $t('step2.startSetupBtn') }} ➝
+          </button>
+        </div>
+      </div>
+
       <!-- Step 01: 模拟实例 -->
       <div class="step-card" :class="{ 'active': phase === 0, 'completed': phase > 0 }">
         <div class="card-header">
@@ -654,7 +676,9 @@ const props = defineProps({
 const emit = defineEmits(['go-back', 'next-step', 'add-log', 'update-status'])
 
 // State
-const phase = ref(0) // 0: 初始化, 1: 生成人设, 2: 生成配置, 3: 完成
+// phase: -1=preflight(region picker), 0=初始化, 1=生成人设, 2=生成配置, 3=完成
+const phase = ref(-1)
+const regionCode = ref('taiwan')
 const taskId = ref(null)
 const prepareProgress = ref(0)
 const currentStage = ref('')
@@ -768,6 +792,12 @@ const selectProfile = (profile) => {
   selectedProfile.value = profile
 }
 
+// 地区选择确认 → 开始准备
+const handleStartSetup = () => {
+  phase.value = 0
+  startPrepareSimulation()
+}
+
 // 自动开始准备模拟
 const startPrepareSimulation = async () => {
   if (!props.simulationId) {
@@ -786,7 +816,8 @@ const startPrepareSimulation = async () => {
     const res = await prepareSimulation({
       simulation_id: props.simulationId,
       use_llm_for_profiles: true,
-      parallel_profile_count: 5
+      parallel_profile_count: 5,
+      region_code: regionCode.value
     })
     
     if (res.success && res.data) {
@@ -1069,10 +1100,9 @@ watch(() => props.systemLogs?.length, () => {
 })
 
 onMounted(() => {
-  // 自动开始准备流程
+  // 停留在 preflight 画面，等待用户选择地区后再启动准备流程
   if (props.simulationId) {
     addLog(t('log.step2Init'))
-    startPrepareSimulation()
   }
 })
 
@@ -1099,6 +1129,66 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* Preflight Card */
+.preflight-card {
+  background: #FFF;
+  border-radius: 8px;
+  padding: 24px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+  border: 1px solid #FF5722;
+}
+
+.preflight-header {
+  margin-bottom: 16px;
+}
+
+.preflight-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.preflight-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.region-select {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #DCDCDC;
+  border-radius: 6px;
+  font-size: 14px;
+  font-family: inherit;
+  background: #FAFAFA;
+  color: #111;
+  cursor: pointer;
+  outline: none;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
+
+.region-select:focus {
+  border-color: #FF5722;
+}
+
+.region-hint {
+  font-size: 12px;
+  color: #888;
+  line-height: 1.6;
+  margin: 0;
+}
+
+.start-setup-btn {
+  align-self: flex-end;
 }
 
 /* Step Card */

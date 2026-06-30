@@ -471,6 +471,11 @@ def prepare_simulation():
         entity_types_list = data.get('entity_types')
         use_llm_for_profiles = data.get('use_llm_for_profiles', True)
         parallel_profile_count = data.get('parallel_profile_count', 5)
+        from ..services.simulation_config_generator import REGION_TIMEZONE_CONFIGS
+        region_code = data.get('region_code', 'china')
+        if region_code not in REGION_TIMEZONE_CONFIGS:
+            logger.warning(f"無效的 region_code '{region_code}'，使用 'china'")
+            region_code = 'china'
         
         # ========== 同步获取实体数量（在后台任务启动前） ==========
         # 这样前端在调用prepare后立即就能获取到预期Agent总数
@@ -594,7 +599,8 @@ def prepare_simulation():
                     use_llm_for_profiles=use_llm_for_profiles,
                     progress_callback=progress_callback,
                     parallel_profile_count=parallel_profile_count,
-                    llm_config=llm_config
+                    llm_config=llm_config,
+                    region_code=region_code,
                 )
                 
                 # 任务完成

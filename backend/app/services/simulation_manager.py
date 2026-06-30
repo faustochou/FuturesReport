@@ -258,7 +258,8 @@ class SimulationManager:
         use_llm_for_profiles: bool = True,
         progress_callback: Optional[callable] = None,
         parallel_profile_count: int = 3,
-        llm_config: Optional[Dict[str, str]] = None
+        llm_config: Optional[Dict[str, str]] = None,
+        region_code: str = "china",
     ) -> SimulationState:
         """
         准备模拟环境（全程自动化）
@@ -458,7 +459,8 @@ class SimulationManager:
                 document_text=document_text,
                 entities=filtered.entities,
                 enable_twitter=state.enable_twitter,
-                enable_reddit=state.enable_reddit
+                enable_reddit=state.enable_reddit,
+                region_code=region_code,
             )
             
             if progress_callback:
