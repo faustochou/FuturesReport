@@ -47,9 +47,8 @@ def create_app(config_class=Config):
         logger.info("Futures Report Backend 启动中...")
         logger.info("=" * 50)
 
-    # 初始化数据库（建表 / 检查连接）
-    if should_log_startup:
-        _init_database(logger)
+    # 初始化数据库（建表 / 检查连接）—— 无条件执行，create_all() 是幂等的
+    _init_database(logger)
 
     # 启用CORS
     CORS(app, resources={r"/api/*": {"origins": "*"}})

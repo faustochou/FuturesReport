@@ -6,6 +6,7 @@ import SimulationRunView from '../views/SimulationRunView.vue'
 import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
 import AdminView from '../views/AdminView.vue'
+import { authState } from '../store/auth'
 
 const routes = [
   {
@@ -53,6 +54,22 @@ const routes = [
 const router = createRouter({
   history: createWebHistory(),
   routes
+})
+
+// Block non-admin users from accessing /admin directly.
+// authState.user is populated synchronously from localStorage on app init,
+// so this check is reliable even on first page load / hard refresh.
+router.beforeEach((to, _from, next) => {
+  if (to.name === 'Admin') {
+    const isAdmin = authState.user?.is_admin
+    // Also allow users who already hold a valid admin session token
+    const hasAdminToken = !!localStorage.getItem('futures_admin_token')
+    if (!isAdmin && !hasAdminToken) {
+      next({ path: '/' })
+      return
+    }
+  }
+  next()
 })
 
 export default router
