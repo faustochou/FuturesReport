@@ -53,3 +53,10 @@ export const deleteUser       = (id)            => adminService.delete(`/api/adm
 
 // Version history
 export const getVersionHistory = () => adminService.get('/api/admin/versions')
+
+// Stripe settings (read-only)
+export const getStripeSettings = () => adminService.get('/api/admin/stripe/settings')
+
+// Subscription tier management
+export const listAdminTiers    = ()               => adminService.get('/api/admin/subscription/tiers')
+export const updateAdminTier   = (code, data)     => adminService.put(`/api/admin/subscription/tiers/${code}`, data)

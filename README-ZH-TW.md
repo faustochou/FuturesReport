@@ -175,6 +175,51 @@ docker compose up -d
 
 > 在 `docker-compose.yml` 中已透過註解提供加速映像檔位址，可依需求替換
 
+## 💳 如何設定 Stripe 金流
+
+FuturesReport 支援 Stripe 訂閱制（目前開放 Lite 方案）。
+
+### 1. 取得 Stripe 金鑰
+
+前往 [Stripe Dashboard → Developers → API Keys](https://dashboard.stripe.com/apikeys)，複製以下兩組金鑰：
+
+- **Secret Key**（`sk_test_...`）— 僅在伺服器端使用，請勿外洩
+- **Publishable Key**（`pk_test_...`）— 前端可見，用於 Stripe.js 初始化
+
+### 2. 建立訂閱方案
+
+1. 進入 [Stripe Dashboard → Product Catalog](https://dashboard.stripe.com/products)
+2. 新增產品「FuturesReport Lite」，類型選「Recurring（訂閱）」
+3. 設定月付金額後，複製產生的 **Price ID**（`price_...`）
+
+### 3. 設定 Webhook
+
+1. 進入 [Stripe Dashboard → Developers → Webhooks](https://dashboard.stripe.com/webhooks)
+2. 新增端點，URL 填入：`https://your-domain.com/api/subscription/webhook`
+3. 選擇監聽以下事件：
+   - `checkout.session.completed`
+   - `customer.subscription.updated`
+   - `customer.subscription.deleted`
+   - `invoice.payment_failed`
+4. 儲存後複製 **Webhook Signing Secret**（`whsec_...`）
+
+### 4. 填入環境變數
+
+在 `.env` 中填入以下變數（或在 Zeabur / Docker 環境中設定）：
+
+```env
+STRIPE_SECRET_KEY=sk_test_your_secret_key
+STRIPE_PUBLISHABLE_KEY=pk_test_your_publishable_key
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret
+STRIPE_PRICE_ID_LITE=price_your_lite_price_id
+```
+
+### 5. 在後台管理系統驗證
+
+啟動服務後，前往 `/admin` → **金流設定** 分頁，確認串接狀態顯示「✓ 已設定」。
+
+> **注意**：Premium 和 Pro 方案目前 `is_available = false`，管理員可在後台 **訂閱分級** 分頁開放並設定 Price ID。
+
 ## 📄 致謝
 
 FuturesReport 的仿真引擎由 **[OASIS](https://github.com/camel-ai/oasis)** 驅動，我們衷心感謝 CAMEL-AI 團隊的開源貢獻！

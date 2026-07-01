@@ -259,6 +259,153 @@
           </article>
         </div>
       </section>
+
+      <!-- ── Stripe Settings ── -->
+      <section v-if="activeTab === 'stripe'" class="settings-panel">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Payment Gateway</p>
+            <h2>金流設定</h2>
+          </div>
+          <button class="icon-btn" type="button" @click="loadStripeSettings">↻</button>
+        </div>
+
+        <div v-if="stripeSettings" class="settings-grid">
+          <!-- Status row -->
+          <div class="setting-card">
+            <p class="setting-label">串接狀態</p>
+            <p class="setting-value">
+              <span class="pill" :class="stripeSettings.is_configured ? 'ready' : ''">
+                {{ stripeSettings.is_configured ? '✓ 已設定' : '✕ 未設定' }}
+              </span>
+              <span v-if="stripeSettings.is_configured" class="pill mode-pill">
+                {{ stripeSettings.is_test_mode ? '測試模式' : '正式模式' }}
+              </span>
+            </p>
+          </div>
+
+          <!-- Secret key -->
+          <div class="setting-card">
+            <p class="setting-label">Secret Key</p>
+            <p class="setting-value mono">
+              {{ stripeSettings.secret_key_hint || '未設定' }}
+              <span class="hint-note">（僅顯示前7碼及後4碼，完整金鑰請在環境變數中管理）</span>
+            </p>
+          </div>
+
+          <!-- Publishable key -->
+          <div class="setting-card">
+            <p class="setting-label">Publishable Key</p>
+            <p class="setting-value mono">{{ stripeSettings.publishable_key_hint || '未設定' }}</p>
+          </div>
+
+          <!-- Webhook -->
+          <div class="setting-card webhook-card">
+            <p class="setting-label">Webhook 端點 URL</p>
+            <div class="webhook-row">
+              <code class="webhook-url">{{ stripeSettings.webhook_url }}</code>
+              <button class="icon-btn copy-btn" type="button" @click="copyWebhookUrl" title="複製">⎘</button>
+            </div>
+            <p class="hint-note">請將此 URL 貼到 Stripe Dashboard → Developers → Webhooks</p>
+            <p class="hint-note">需啟用事件：checkout.session.completed、customer.subscription.updated、customer.subscription.deleted、invoice.payment_failed</p>
+            <p class="setting-value">
+              <span class="pill" :class="stripeSettings.webhook_configured ? 'ready' : ''">
+                Webhook Secret {{ stripeSettings.webhook_configured ? '✓ 已設定' : '✕ 未設定' }}
+              </span>
+            </p>
+          </div>
+
+          <!-- Env var instructions -->
+          <div class="setting-card env-card">
+            <p class="setting-label">環境變數設定說明</p>
+            <pre class="env-block">STRIPE_SECRET_KEY=sk_test_...
+STRIPE_PUBLISHABLE_KEY=pk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_PRICE_ID_LITE=price_...</pre>
+            <p class="hint-note">取得金鑰：Stripe Dashboard → Developers → API Keys</p>
+          </div>
+        </div>
+        <p v-else class="muted">讀取中...</p>
+        <p v-if="stripeError" class="error-text">{{ stripeError }}</p>
+      </section>
+
+      <!-- ── Subscription Tiers ── -->
+      <section v-if="activeTab === 'tiers'" class="tiers-panel">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">Subscription Plans</p>
+            <h2>訂閱分級管理</h2>
+          </div>
+          <button class="icon-btn" type="button" @click="loadTiers">↻</button>
+        </div>
+
+        <div class="tier-list">
+          <div v-for="tier in tiers" :key="tier.tier_code" class="tier-card">
+            <div class="tier-card-header">
+              <div>
+                <strong class="tier-name">{{ tier.display_name }}</strong>
+                <code class="tier-code">{{ tier.tier_code }}</code>
+              </div>
+              <span class="pill" :class="tier.is_available ? 'ready' : 'unavail-pill'">
+                {{ tier.is_available ? '上架中' : '尚未開放' }}
+              </span>
+            </div>
+
+            <div class="tier-form">
+              <!-- is_available toggle -->
+              <label class="check-row">
+                <input
+                  type="checkbox"
+                  :checked="tier.is_available"
+                  @change="toggleTierAvailability(tier)"
+                  :disabled="tierLoading === tier.tier_code"
+                />
+                <span>開放此方案（上架）</span>
+              </label>
+
+              <!-- Stripe Price ID -->
+              <label>
+                <span>Stripe Price ID</span>
+                <div class="inline-row">
+                  <input
+                    :value="tierEdits[tier.tier_code]?.price_id ?? tier.stripe_price_id ?? ''"
+                    @input="setTierEdit(tier.tier_code, 'price_id', $event.target.value)"
+                    placeholder="price_xxxxxxxxxxxx"
+                    class="price-input"
+                  />
+                  <button
+                    class="action-btn"
+                    type="button"
+                    :disabled="tierLoading === tier.tier_code"
+                    @click="saveTierPriceId(tier)"
+                  >儲存</button>
+                </div>
+              </label>
+
+              <!-- Feature flags -->
+              <label>
+                <span>功能開關 (JSON)</span>
+                <textarea
+                  :value="tierEdits[tier.tier_code]?.flags ?? JSON.stringify(tier.feature_flags, null, 2)"
+                  @input="setTierEdit(tier.tier_code, 'flags', $event.target.value)"
+                  rows="5"
+                  class="flags-textarea"
+                  placeholder='{"max_agents": 100, "sim_runs_per_month": 10}'
+                ></textarea>
+                <button
+                  class="action-btn"
+                  type="button"
+                  :disabled="tierLoading === tier.tier_code"
+                  @click="saveTierFlags(tier)"
+                >儲存功能開關</button>
+              </label>
+
+              <p v-if="tierMessages[tier.tier_code]" class="success-text">{{ tierMessages[tier.tier_code] }}</p>
+              <p v-if="tierErrors[tier.tier_code]" class="error-text">{{ tierErrors[tier.tier_code] }}</p>
+            </div>
+          </div>
+        </div>
+      </section>
     </template>
   </main>
 </template>
@@ -274,9 +421,12 @@ import {
   getAdminMe,
   getAdminUsers,
   getDashboard,
+  getStripeSettings,
   getVersionHistory,
+  listAdminTiers,
   setAdminToken,
   toggleUserActive,
+  updateAdminTier,
   updateAdminUser,
 } from '../api/admin'
 import DEFAULT_PROVIDERS from '../config/providers'
@@ -288,6 +438,8 @@ const activeTab = ref('dashboard')
 const tabs = [
   { id: 'dashboard', label: '系統總覽' },
   { id: 'users',     label: '用戶管理' },
+  { id: 'stripe',    label: '金流設定' },
+  { id: 'tiers',     label: '訂閱分級' },
   { id: 'versions',  label: '版本紀錄' },
 ]
 
@@ -326,10 +478,23 @@ const filteredUsers   = computed(() => {
   })
 })
 
+// Stripe settings
+const stripeSettings = ref(null)
+const stripeError    = ref('')
+
+// Tier management
+const tiers       = ref([])
+const tierEdits   = reactive({})   // { [tier_code]: { price_id, flags } }
+const tierLoading = ref('')        // tier_code currently saving
+const tierMessages = reactive({})
+const tierErrors   = reactive({})
+
 // Auto-load tab data when switching
 watch(activeTab, (tab) => {
   if (tab === 'dashboard') loadDashboard()
   if (tab === 'users')     loadUsers()
+  if (tab === 'stripe')    loadStripeSettings()
+  if (tab === 'tiers')     loadTiers()
   if (tab === 'versions')  loadVersions()
 })
 
@@ -534,6 +699,79 @@ const confirmDelete = async () => {
   } finally {
     loading.value = false
   }
+}
+
+// ── Stripe Settings ──────────────────────────────────────────────────────────
+
+const loadStripeSettings = async () => {
+  stripeError.value = ''
+  try {
+    const res = await getStripeSettings()
+    stripeSettings.value = res.data?.stripe || null
+  } catch (err) {
+    stripeError.value = err.message || '讀取金流設定失敗'
+  }
+}
+
+const copyWebhookUrl = () => {
+  const url = stripeSettings.value?.webhook_url
+  if (!url) return
+  navigator.clipboard.writeText(url).catch(() => {})
+}
+
+// ── Subscription Tiers ───────────────────────────────────────────────────────
+
+const loadTiers = async () => {
+  try {
+    const res = await listAdminTiers()
+    tiers.value = res.data?.tiers || []
+  } catch (err) {
+    error.value = err.message || '讀取方案列表失敗'
+  }
+}
+
+const setTierEdit = (code, field, value) => {
+  if (!tierEdits[code]) tierEdits[code] = {}
+  tierEdits[code][field] = value
+}
+
+const _saveTier = async (tier, payload) => {
+  tierLoading.value = tier.tier_code
+  tierMessages[tier.tier_code] = ''
+  tierErrors[tier.tier_code]   = ''
+  try {
+    const res = await updateAdminTier(tier.tier_code, payload)
+    const updated = res.data?.tier
+    tiers.value = tiers.value.map(t =>
+      t.tier_code === tier.tier_code ? updated : t
+    )
+    tierMessages[tier.tier_code] = '已儲存'
+  } catch (err) {
+    tierErrors[tier.tier_code] = err.message || '儲存失敗'
+  } finally {
+    tierLoading.value = ''
+  }
+}
+
+const toggleTierAvailability = (tier) => {
+  _saveTier(tier, { is_available: !tier.is_available })
+}
+
+const saveTierPriceId = (tier) => {
+  const price_id = (tierEdits[tier.tier_code]?.price_id ?? tier.stripe_price_id ?? '').trim()
+  _saveTier(tier, { stripe_price_id: price_id })
+}
+
+const saveTierFlags = (tier) => {
+  const raw = tierEdits[tier.tier_code]?.flags ?? JSON.stringify(tier.feature_flags)
+  let parsed
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    tierErrors[tier.tier_code] = 'JSON 格式錯誤，請檢查語法'
+    return
+  }
+  _saveTier(tier, { feature_flags: parsed })
 }
 
 onMounted(loadAdminSession)
@@ -887,12 +1125,168 @@ input, select {
 .change-column h4 { margin: 0 0 8px; font-size: 12px; }
 .change-column ul { margin: 0; padding-left: 18px; color: #222; font-size: 13px; line-height: 1.5; }
 
+/* ── Stripe Settings ── */
+.settings-panel, .tiers-panel {
+  border: 1px solid #111;
+  background: #fff;
+  box-shadow: 6px 6px 0 #111;
+  padding: 18px;
+}
+
+.settings-grid {
+  display: grid;
+  gap: 12px;
+}
+
+.setting-card {
+  border: 1px solid #ddd;
+  padding: 14px;
+  background: #f6f6f1;
+}
+
+.setting-label {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  color: #666;
+}
+
+.setting-value {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 800;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+.webhook-card { grid-column: 1 / -1; }
+
+.webhook-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.webhook-url {
+  flex: 1;
+  padding: 8px 10px;
+  border: 1px solid #111;
+  background: #fff;
+  font-size: 12px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.copy-btn { flex: none; }
+
+.env-card { grid-column: 1 / -1; }
+
+.env-block {
+  margin: 8px 0;
+  padding: 12px;
+  border: 1px solid #ddd;
+  background: #111;
+  color: #03bf65;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  line-height: 1.7;
+  overflow-x: auto;
+}
+
+.hint-note {
+  margin: 4px 0 0;
+  font-size: 11px;
+  color: #888;
+  font-weight: 400;
+}
+
+.mode-pill {
+  border-color: #2563eb;
+  color: #1e40af;
+  background: #eff6ff;
+}
+
+/* ── Tier Management ── */
+.tier-list {
+  display: grid;
+  gap: 14px;
+}
+
+.tier-card {
+  border: 1px solid #ddd;
+  background: #f6f6f1;
+  padding: 16px;
+}
+
+.tier-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.tier-name {
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.tier-code {
+  margin-left: 8px;
+  padding: 2px 6px;
+  border: 1px solid #ddd;
+  background: #fff;
+  font-size: 12px;
+  color: #666;
+}
+
+.tier-form {
+  display: grid;
+  gap: 14px;
+}
+
+.inline-row {
+  display: flex;
+  gap: 8px;
+  align-items: stretch;
+}
+
+.price-input {
+  flex: 1;
+}
+
+.flags-textarea {
+  width: 100%;
+  border: 1px solid #111;
+  padding: 8px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-family: 'JetBrains Mono', monospace;
+  background: #fff;
+  color: #111;
+  resize: vertical;
+  display: block;
+  margin-bottom: 8px;
+}
+
+.unavail-pill {
+  border-color: #c97c2e;
+  color: #7a4a10;
+  background: #fdf6ec;
+}
+
 @media (max-width: 860px) {
   .admin-page    { padding: 76px 14px 24px; }
   .admin-layout  { grid-template-columns: 1fr; }
   .change-columns { grid-template-columns: 1fr; }
   .stat-grid     { grid-template-columns: repeat(2, 1fr); }
-  .tab-bar       { width: 100%; }
-  .tab-btn       { flex: 1; text-align: center; }
+  .tab-bar       { width: 100%; overflow-x: auto; }
+  .tab-btn       { flex: none; white-space: nowrap; }
 }
 </style>

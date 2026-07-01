@@ -22,6 +22,9 @@ dependencies = [
     # LLM 相关
     "openai>=1.0.0",
 
+    # 金流
+    "stripe>=10.0.0",
+
     # Zep Cloud
     "zep-cloud==3.13.0",
 

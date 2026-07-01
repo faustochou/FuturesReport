@@ -10,6 +10,7 @@ from flask import jsonify, request
 from . import admin_bp
 from ..models.user import UserManager
 from ..utils.auth import current_admin, require_admin
+from ..services import subscription_service as sub_svc
 
 
 def _version_history_path() -> str:
@@ -197,3 +198,60 @@ def version_history():
             item["commit"] = _runtime_commit()
 
     return jsonify({"success": True, "data": {"versions": versions}})
+
+
+# ---------------------------------------------------------------------------
+# Stripe settings (read-only for now; keys are managed via env vars)
+# ---------------------------------------------------------------------------
+
+@admin_bp.route("/stripe/settings", methods=["GET"])
+@require_admin
+def stripe_settings():
+    """Return a safe summary of Stripe configuration status."""
+    summary = sub_svc.get_stripe_settings_summary()
+    # Append the full webhook URL so admin can copy-paste it into Stripe Dashboard
+    summary["webhook_url"] = request.host_url.rstrip("/") + "/api/subscription/webhook"
+    return jsonify({"success": True, "data": {"stripe": summary}})
+
+
+# ---------------------------------------------------------------------------
+# Subscription tier management
+# ---------------------------------------------------------------------------
+
+@admin_bp.route("/subscription/tiers", methods=["GET"])
+@require_admin
+def list_tiers():
+    return jsonify({
+        "success": True,
+        "data": {"tiers": sub_svc.get_all_tiers()},
+    })
+
+
+@admin_bp.route("/subscription/tiers/<tier_code>", methods=["PUT"])
+@require_admin
+def update_tier(tier_code: str):
+    """Update a tier's is_available, stripe_price_id, or feature_flags."""
+    data = request.get_json() or {}
+
+    kwargs = {}
+    if "is_available" in data:
+        kwargs["is_available"] = bool(data["is_available"])
+    if "stripe_price_id" in data:
+        kwargs["stripe_price_id"] = str(data["stripe_price_id"] or "")
+    if "feature_flags" in data:
+        if not isinstance(data["feature_flags"], dict):
+            return jsonify({
+                "success": False,
+                "error": "feature_flags 必須是 JSON 物件",
+            }), 400
+        kwargs["feature_flags"] = data["feature_flags"]
+
+    if not kwargs:
+        return jsonify({"success": False, "error": "沒有可更新的欄位"}), 400
+
+    try:
+        updated = sub_svc.update_tier(tier_code, **kwargs)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+
+    return jsonify({"success": True, "data": {"tier": updated}})

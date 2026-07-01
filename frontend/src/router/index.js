@@ -6,6 +6,7 @@ import SimulationRunView from '../views/SimulationRunView.vue'
 import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
 import AdminView from '../views/AdminView.vue'
+import SubscriptionView from '../views/SubscriptionView.vue'
 import { authState } from '../store/auth'
 
 const routes = [
@@ -13,6 +14,11 @@ const routes = [
     path: '/',
     name: 'Home',
     component: Home
+  },
+  {
+    path: '/subscription',
+    name: 'Subscription',
+    component: SubscriptionView
   },
   {
     path: '/process/:projectId',
