@@ -17,10 +17,23 @@ from .utils.logger import setup_logger, get_logger
 
 
 def _init_database(logger) -> None:
-    """Initialise the database engine, create tables, and seed reference data."""
+    """Initialise the database engine and seed reference data.
+
+    Schema management strategy
+    --------------------------
+    Production (Zeabur + PostgreSQL):
+        Alembic migrations run BEFORE this function is called — via the
+        Dockerfile CMD (`alembic upgrade head && npm run dev`).
+        create_tables() is a no-op here because all tables already exist.
+
+    Local development (SQLite fallback, no Dockerfile):
+        Alembic is NOT run automatically.  create_tables() acts as a safety
+        net: it creates any missing tables so the app can start without a
+        manual `alembic upgrade head`.
+    """
     from .db.database import init_engine, create_tables, seed_subscription_tiers
     init_engine()
-    create_tables()
+    create_tables()          # no-op when alembic already ran; safety net for local dev
     seed_subscription_tiers()
     logger.info("数据库初始化完成")
 

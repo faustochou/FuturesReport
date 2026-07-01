@@ -30,4 +30,7 @@ VOLUME ["/data"]
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
   CMD python -c "import urllib.request,sys,os; p=os.environ.get('BACKEND_PORT','5001'); sys.exit(0 if urllib.request.urlopen(f'http://127.0.0.1:{p}/health',timeout=6).getcode()==200 else 1)" || exit 1
 
-CMD ["npm", "run", "dev"]
+# Run Alembic migrations first, then start the application.
+# Using && so startup aborts if migrations fail (prevents running with wrong schema).
+# exec replaces sh with npm so SIGTERM from Docker/Zeabur reaches npm directly.
+CMD ["/bin/sh", "-c", "cd /app/backend && uv run alembic upgrade head && cd /app && exec npm run dev"]
