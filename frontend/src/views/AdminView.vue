@@ -108,6 +108,12 @@
                 <span class="pill" :class="{ ready: user.llm_configured }">
                   {{ user.llm_configured ? 'LLM ✓' : 'LLM —' }}
                 </span>
+                <span
+                  class="pill"
+                  :class="user.subscription?.status === 'active' ? 'sub-active-pill' : 'sub-none-pill'"
+                >
+                  {{ user.subscription ? user.subscription.tier_code : '無訂閱' }}
+                </span>
               </span>
             </button>
           </div>
@@ -204,6 +210,44 @@
 
             <p v-if="message" class="success-text">{{ message }}</p>
             <p v-if="error" class="error-text">{{ error }}</p>
+
+            <!-- Subscription override -->
+            <div class="divider"></div>
+            <div class="sub-mgmt">
+              <p class="eyebrow">訂閱管理（管理員覆寫）</p>
+              <p class="sub-current-line">
+                目前方案：
+                <span
+                  class="pill"
+                  :class="selectedUser.subscription?.status === 'active' ? 'sub-active-pill' : ''"
+                >
+                  {{ selectedUser.subscription ? selectedUser.subscription.tier_code : '無訂閱' }}
+                </span>
+                <span v-if="selectedUser.subscription?.stripe_subscription_id" class="sub-via">
+                  （Stripe 訂閱）
+                </span>
+                <span v-else-if="selectedUser.subscription" class="sub-via">
+                  （管理員設定）
+                </span>
+              </p>
+              <div class="inline-row sub-action-row">
+                <select v-model="subForm.tierCode" class="sub-select">
+                  <option value="">撤銷訂閱</option>
+                  <option v-for="t in tiers" :key="t.tier_code" :value="t.tier_code">
+                    {{ t.display_name }}
+                  </option>
+                </select>
+                <button
+                  class="action-btn"
+                  type="button"
+                  :disabled="subLoading"
+                  @click="setSubscription"
+                >{{ subLoading ? '套用中...' : '套用' }}</button>
+              </div>
+              <p class="sub-hint">套用後立即生效，無需 Stripe 付款流程。</p>
+              <p v-if="subMessage" class="success-text">{{ subMessage }}</p>
+              <p v-if="subError" class="error-text">{{ subError }}</p>
+            </div>
           </template>
 
           <div v-else class="empty-state">
@@ -425,6 +469,7 @@ import {
   getVersionHistory,
   listAdminTiers,
   setAdminToken,
+  setUserSubscription,
   toggleUserActive,
   updateAdminTier,
   updateAdminUser,
@@ -489,10 +534,16 @@ const tierLoading = ref('')        // tier_code currently saving
 const tierMessages = reactive({})
 const tierErrors   = reactive({})
 
+// User subscription override (admin)
+const subLoading = ref(false)
+const subMessage = ref('')
+const subError   = ref('')
+const subForm    = reactive({ tierCode: '' })
+
 // Auto-load tab data when switching
 watch(activeTab, (tab) => {
   if (tab === 'dashboard') loadDashboard()
-  if (tab === 'users')     loadUsers()
+  if (tab === 'users')     { loadUsers(); loadTiers() }
   if (tab === 'stripe')    loadStripeSettings()
   if (tab === 'tiers')     loadTiers()
   if (tab === 'versions')  loadVersions()
@@ -591,6 +642,27 @@ const selectUser = (user) => {
   editForm.llm.clear         = false
   message.value              = ''
   error.value                = ''
+  subForm.tierCode           = user.subscription?.tier_code || ''
+  subMessage.value           = ''
+  subError.value             = ''
+}
+
+const setSubscription = async () => {
+  if (!selectedUser.value) return
+  subLoading.value = true
+  subMessage.value = ''
+  subError.value   = ''
+  try {
+    const res = await setUserSubscription(selectedUser.value.user_id, subForm.tierCode || null)
+    _refreshUser(res.data)
+    subMessage.value = subForm.tierCode
+      ? `已設定為 ${subForm.tierCode} 方案`
+      : '已撤銷訂閱'
+  } catch (err) {
+    subError.value = err.message || '操作失敗'
+  } finally {
+    subLoading.value = false
+  }
 }
 
 const syncProviderDefaults = () => {
@@ -1279,6 +1351,64 @@ input, select {
   border-color: #c97c2e;
   color: #7a4a10;
   background: #fdf6ec;
+}
+
+/* ── Subscription pills (user list) ── */
+.sub-active-pill {
+  border-color: #1a936f;
+  color: #116249;
+  background: #f1faf6;
+  text-transform: uppercase;
+  font-size: 10px;
+}
+
+.sub-none-pill {
+  border-color: #ccc;
+  color: #888;
+  background: #f5f5f5;
+  font-size: 10px;
+}
+
+/* ── Subscription override (editor) ── */
+.sub-mgmt {
+  display: grid;
+  gap: 10px;
+  padding-top: 4px;
+}
+
+.sub-current-line {
+  margin: 0;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.sub-via {
+  font-size: 11px;
+  color: #888;
+}
+
+.sub-action-row {
+  align-items: stretch;
+}
+
+.sub-select {
+  flex: 1;
+  border: 1px solid #111;
+  background: #fff;
+  color: #111;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 13px;
+  height: 38px;
+}
+
+.sub-hint {
+  margin: 0;
+  font-size: 11px;
+  color: #888;
 }
 
 @media (max-width: 860px) {

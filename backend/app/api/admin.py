@@ -179,6 +179,22 @@ def delete_user(user_id: str):
     return jsonify({"success": True, "data": {}})
 
 
+@admin_bp.route("/users/<user_id>/subscription", methods=["PUT"])
+@require_admin
+def set_user_subscription(user_id: str):
+    """Admin override: grant or revoke a subscription tier without Stripe."""
+    data = request.get_json() or {}
+    tier_code = (data.get("tier_code") or "").strip().lower() or None
+    try:
+        updated = UserManager.set_user_subscription(user_id, tier_code)
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    return jsonify({
+        "success": True,
+        "data": {"user": UserManager.public_user(updated)},
+    })
+
+
 # ---------------------------------------------------------------------------
 # Version history
 # ---------------------------------------------------------------------------

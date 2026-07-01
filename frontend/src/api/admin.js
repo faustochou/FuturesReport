@@ -58,5 +58,8 @@ export const getVersionHistory = () => adminService.get('/api/admin/versions')
 export const getStripeSettings = () => adminService.get('/api/admin/stripe/settings')
 
 // Subscription tier management
-export const listAdminTiers    = ()               => adminService.get('/api/admin/subscription/tiers')
-export const updateAdminTier   = (code, data)     => adminService.put(`/api/admin/subscription/tiers/${code}`, data)
+export const listAdminTiers       = ()               => adminService.get('/api/admin/subscription/tiers')
+export const updateAdminTier      = (code, data)     => adminService.put(`/api/admin/subscription/tiers/${code}`, data)
+
+// User subscription override (admin-granted, no Stripe)
+export const setUserSubscription  = (id, tier_code)  => adminService.put(`/api/admin/users/${id}/subscription`, { tier_code })

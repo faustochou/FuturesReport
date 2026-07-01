@@ -151,6 +151,7 @@ def _dt(dt: Optional[datetime]) -> Optional[str]:
 def _orm_to_dict(user: User) -> Dict[str, Any]:
     """Convert a SQLAlchemy User row to the canonical dict format."""
     llm = user.llm_config
+    sub = user.subscription
     return {
         "user_id": user.user_id,
         "username": user.username,
@@ -167,6 +168,12 @@ def _orm_to_dict(user: User) -> Dict[str, Any]:
             "api_key_hint": llm.api_key_hint,
             "updated_at": _dt(llm.updated_at),
         } if llm else None,
+        "subscription": {
+            "tier_code": sub.tier_code,
+            "status": sub.status,
+            "stripe_subscription_id": sub.stripe_subscription_id,
+            "stripe_customer_id": sub.stripe_customer_id,
+        } if sub else None,
     }
 
 
@@ -289,6 +296,7 @@ class UserManager:
     @classmethod
     def public_user(cls, user: Dict[str, Any]) -> Dict[str, Any]:
         llm_config = user.get("llm_config") or {}
+        sub = user.get("subscription")
         return {
             "user_id": user.get("user_id"),
             "username": user.get("username"),
@@ -304,6 +312,7 @@ class UserManager:
                 "api_key_hint": llm_config.get("api_key_hint"),
                 "updated_at": llm_config.get("updated_at"),
             } if llm_config else None,
+            "subscription": sub,
         }
 
     # ------------------------------------------------------------------
@@ -562,6 +571,54 @@ class UserManager:
                 if admin_count <= 1:
                     raise ValueError("Cannot delete the last administrator.")
             db.delete(user)
+
+    @classmethod
+    def set_user_subscription(
+        cls, user_id: str, tier_code: Optional[str]
+    ) -> Dict[str, Any]:
+        """Admin override: grant or revoke a subscription tier without Stripe."""
+        from ..db.models import UserSubscription, SubscriptionTier
+
+        with get_db() as db:
+            user = db.execute(
+                select(User).where(User.user_id == user_id)
+            ).scalar_one_or_none()
+            if not user:
+                raise ValueError("User not found.")
+
+            if not tier_code:
+                if user.subscription:
+                    db.delete(user.subscription)
+                    user.subscription = None
+            else:
+                tier = db.execute(
+                    select(SubscriptionTier).where(
+                        SubscriptionTier.tier_code == tier_code
+                    )
+                ).scalar_one_or_none()
+                if tier is None:
+                    raise ValueError(f"未知方案代碼：{tier_code}")
+
+                now = datetime.utcnow()
+                if user.subscription:
+                    user.subscription.tier_code = tier_code
+                    user.subscription.status = "active"
+                    user.subscription.updated_at = now
+                else:
+                    new_sub = UserSubscription(
+                        user_id=user_id,
+                        tier_code=tier_code,
+                        status="active",
+                        created_at=now,
+                        updated_at=now,
+                    )
+                    db.add(new_sub)
+                    user.subscription = new_sub
+
+            db.flush()
+            result = _orm_to_dict(user)
+
+        return result
 
     @classmethod
     def get_stats(cls) -> Dict[str, int]:
