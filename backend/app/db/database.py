@@ -97,6 +97,48 @@ def create_tables() -> None:
     Base.metadata.create_all(bind=get_engine())
 
 
+def seed_subscription_tiers() -> None:
+    """Insert the three default subscription tiers if the table is empty (idempotent)."""
+    from .models import SubscriptionTier
+    from datetime import datetime
+    from sqlalchemy import select, func
+
+    with get_db() as db:
+        count = db.execute(
+            select(func.count()).select_from(SubscriptionTier)
+        ).scalar_one()
+        if count > 0:
+            return
+        now = datetime.utcnow()
+        db.add_all([
+            SubscriptionTier(
+                tier_code="lite",
+                display_name="Lite",
+                is_available=True,
+                feature_flags={
+                    "max_agents": 100,
+                    "sim_runs_per_month": 10,
+                    "report_export": True,
+                },
+                updated_at=now,
+            ),
+            SubscriptionTier(
+                tier_code="premium",
+                display_name="Premium",
+                is_available=False,
+                feature_flags={},
+                updated_at=now,
+            ),
+            SubscriptionTier(
+                tier_code="pro",
+                display_name="Pro",
+                is_available=False,
+                feature_flags={},
+                updated_at=now,
+            ),
+        ])
+
+
 def ping() -> bool:
     """Return True if the database is reachable."""
     try:

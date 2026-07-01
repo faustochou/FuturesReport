@@ -209,8 +209,14 @@ def version_history():
 def stripe_settings():
     """Return a safe summary of Stripe configuration status."""
     summary = sub_svc.get_stripe_settings_summary()
-    # Append the full webhook URL so admin can copy-paste it into Stripe Dashboard
-    summary["webhook_url"] = request.host_url.rstrip("/") + "/api/subscription/webhook"
+    # Build webhook URL from SITE_URL env var (required behind Zeabur reverse proxy,
+    # because request.host_url returns the internal container address, not the public domain).
+    site_url = os.environ.get("SITE_URL", "").strip().rstrip("/")
+    if not site_url:
+        proto = request.headers.get("X-Forwarded-Proto", request.scheme)
+        host  = request.headers.get("X-Forwarded-Host", request.host)
+        site_url = f"{proto}://{host}"
+    summary["webhook_url"] = f"{site_url}/api/subscription/webhook"
     return jsonify({"success": True, "data": {"stripe": summary}})
 
 

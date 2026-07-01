@@ -17,10 +17,11 @@ from .utils.logger import setup_logger, get_logger
 
 
 def _init_database(logger) -> None:
-    """Initialise the database engine and create tables if they don't exist."""
-    from .db.database import init_engine, create_tables
+    """Initialise the database engine, create tables, and seed reference data."""
+    from .db.database import init_engine, create_tables, seed_subscription_tiers
     init_engine()
     create_tables()
+    seed_subscription_tiers()
     logger.info("数据库初始化完成")
 
 

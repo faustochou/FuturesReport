@@ -1,6 +1,67 @@
 {
   "versions": [
     {
+      "version": "2026-07-01.2",
+      "commit": "pending",
+      "date": "2026-07-01",
+      "title": "Fix webhook URL, seed subscription tiers, add SITE_URL config",
+      "summary": "Corrects the Stripe Webhook URL shown in the admin panel so it reflects the public domain instead of the internal container address. Subscription tiers (Lite / Premium / Pro) are now auto-seeded on every cold start, so they always appear in the admin panel. Adds SITE_URL environment variable support.",
+      "added": [
+        "SITE_URL environment variable — set to the public domain so the admin panel shows the correct Webhook URL behind Zeabur / reverse-proxy",
+        "seed_subscription_tiers() — idempotent seeder that inserts Lite / Premium / Pro tiers on first startup",
+        "Seed call added to _init_database() so tiers are always present after any cold start"
+      ],
+      "modified": [
+        "Admin Stripe settings endpoint now builds webhook_url from SITE_URL (or X-Forwarded-Host fallback) instead of request.host_url",
+        ".env.example now includes SITE_URL with the production domain pre-filled"
+      ],
+      "deleted": []
+    },
+    {
+      "version": "2026-07-01.1",
+      "commit": "pending",
+      "date": "2026-07-01",
+      "title": "Stripe subscription system (Lite / Premium / Pro)",
+      "summary": "Implements a full Stripe subscription system with three tiers (currently only Lite is open). Includes a backend service layer, webhook handler, checkout/portal sessions, admin Stripe configuration panel, admin subscription tier management, and a public pricing page.",
+      "added": [
+        "SubscriptionTier and UserSubscription database models",
+        "Alembic migration 002 for subscription tables",
+        "subscription_service.py — Stripe checkout, portal, webhook, and feature-flag helpers",
+        "GET /api/subscription/status — returns current user subscription state",
+        "POST /api/subscription/create-checkout-session — initiates Stripe Checkout flow",
+        "POST /api/subscription/create-portal-session — opens Stripe Customer Portal",
+        "POST /api/subscription/webhook — verifies and handles Stripe webhook events",
+        "Admin GET /api/admin/stripe/settings — masked key status + webhook URL",
+        "Admin GET /api/admin/subscription/tiers — list all tiers",
+        "Admin PUT /api/admin/subscription/tiers/<code> — toggle availability, set Price ID and feature flags",
+        "Admin console tabs: 金流設定 and 訂閱分級",
+        "Frontend /subscription pricing page (SubscriptionView.vue)",
+        "frontend/src/api/subscription.js API client"
+      ],
+      "modified": [
+        "backend/pyproject.toml — added stripe>=10.0.0 dependency",
+        "Admin console now has Stripe configuration and tier management tabs",
+        "README-ZH-TW.md — added Stripe setup guide (5 steps)"
+      ],
+      "deleted": []
+    },
+    {
+      "version": "2026-06-29.1",
+      "commit": "pending",
+      "date": "2026-06-29",
+      "title": "Auth persistence fix, admin route guard, homepage title update",
+      "summary": "Fixes a regression where database tables were only created when startup logging was active, causing auth failures on first request. Adds a Vue Router guard to block non-admin users from /admin. Updates the English homepage hero title.",
+      "added": [
+        "Vue Router beforeEach guard — redirects non-admin users away from /admin",
+        "frontend/src/views/SubscriptionView.vue — pricing page scaffold"
+      ],
+      "modified": [
+        "_init_database() now runs unconditionally (moved outside the should_log_startup conditional)",
+        "English homepage hero title changed to 'Exploring Possible Futures'"
+      ],
+      "deleted": []
+    },
+    {
       "version": "2026-06-12.4",
       "commit": "pending",
       "date": "2026-06-12",
