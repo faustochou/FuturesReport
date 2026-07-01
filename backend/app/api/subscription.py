@@ -116,7 +116,7 @@ def stripe_webhook():
 
     try:
         event = svc.construct_webhook_event(payload, sig_header)
-    except stripe.error.SignatureVerificationError as exc:
+    except stripe.SignatureVerificationError as exc:
         return jsonify({"success": False, "error": f"Webhook 簽名驗證失敗: {exc}"}), 400
     except RuntimeError as exc:
         return jsonify({"success": False, "error": str(exc)}), 503
