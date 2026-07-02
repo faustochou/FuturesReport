@@ -7,6 +7,7 @@ import ReportView from '../views/ReportView.vue'
 import InteractionView from '../views/InteractionView.vue'
 import AdminView from '../views/AdminView.vue'
 import SubscriptionView from '../views/SubscriptionView.vue'
+import SimulateLaunchView from '../views/SimulateLaunchView.vue'
 import { authState } from '../store/auth'
 
 const routes = [
@@ -19,6 +20,12 @@ const routes = [
     path: '/subscription',
     name: 'Subscription',
     component: SubscriptionView
+  },
+  {
+    path: '/launch',
+    name: 'SimulateLaunch',
+    component: SimulateLaunchView,
+    meta: { requiresSubscription: true }
   },
   {
     path: '/process/:projectId',
@@ -62,19 +69,33 @@ const router = createRouter({
   routes
 })
 
-// Block non-admin users from accessing /admin directly.
-// authState.user is populated synchronously from localStorage on app init,
-// so this check is reliable even on first page load / hard refresh.
 router.beforeEach((to, _from, next) => {
+  // Block non-admin users from /admin
   if (to.name === 'Admin') {
     const isAdmin = authState.user?.is_admin
-    // Also allow users who already hold a valid admin session token
     const hasAdminToken = !!localStorage.getItem('futures_admin_token')
     if (!isAdmin && !hasAdminToken) {
       next({ path: '/' })
       return
     }
   }
+
+  // Pages with requiresSubscription: redirect to /subscription when not subscribed.
+  // The SimulateLaunchView also shows its own gate UI for finer-grained feedback,
+  // but this guard prevents direct URL access without any subscription at all.
+  if (to.meta?.requiresSubscription) {
+    if (!authState.token) {
+      next({ path: '/' })
+      return
+    }
+    const sub = authState.user?.subscription
+    const hasActiveSub = sub?.status === 'active' && ['lite', 'premium', 'pro'].includes(sub?.tier_code)
+    if (!hasActiveSub) {
+      next({ path: '/subscription' })
+      return
+    }
+  }
+
   next()
 })
 

@@ -67,7 +67,30 @@
     "promptPlaceholder": "// 用自然語言輸入模擬或預測需求（例.武大若發布撤銷肖某處分的公告，會引發什麼輿情走向）",
     "engineBadge": "引擎: 未來報告-V1.0",
     "startEngine": "啟動引擎",
-    "initializing": "初始化中..."
+    "initializing": "初始化中...",
+    "methodologyBadge": "未來學研究方法論",
+    "methodologyTitle": "未來學研究引擎",
+    "methodologyDesc": "基於嚴謹的未來學研究方法論，透過企業年報、財務報告、政府政策文件與學術研究，推演複雜系統的未來走向，提供科學化的決策支援。",
+    "reportTypesLabel": "支援報告類型",
+    "reportCorporate": "企業年報 & 財報",
+    "reportGovernment": "政府政策報告",
+    "reportAcademic": "學術研究報告",
+    "reportInternational": "國際機構報告",
+    "methodLabel": "分析方法論",
+    "ctaTitle": "開始推演未來",
+    "ctaHint": "需要 Lite 或以上訂閱方案",
+    "ctaStart": "啟動推演引擎 →",
+    "ctaSubscribe": "查看訂閱方案 →"
+  },
+  "launch": {
+    "title": "推演引擎",
+    "subtitle": "上傳報告 · 啟動未來推演序列",
+    "loginRequired": "請先登入",
+    "loginDesc": "登入後方可使用推演引擎功能。",
+    "loginBtn": "返回首頁登入",
+    "gateTitle": "需要訂閱方案",
+    "gateDesc": "使用推演引擎需要 Lite 或以上的訂閱方案。請升級您的帳號以解鎖此功能。",
+    "gateBtn": "查看訂閱方案"
   },
   "main": {
     "layoutGraph": "圖譜",

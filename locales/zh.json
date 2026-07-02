@@ -67,7 +67,30 @@
     "promptPlaceholder": "// 用自然语言输入模拟或预测需求（例.武大若发布撤销肖某处分的公告，会引发什么舆情走向）",
     "engineBadge": "引擎: 未來報告-V1.0",
     "startEngine": "启动引擎",
-    "initializing": "初始化中..."
+    "initializing": "初始化中...",
+    "methodologyBadge": "未来学研究方法论",
+    "methodologyTitle": "未来学研究引擎",
+    "methodologyDesc": "基于严谨的未来学研究方法论，通过企业年报、财务报告、政府政策文件与学术研究，推演复杂系统的未来走向，提供科学化的决策支撑。",
+    "reportTypesLabel": "支持报告类型",
+    "reportCorporate": "企业年报 & 财报",
+    "reportGovernment": "政府政策报告",
+    "reportAcademic": "学术研究报告",
+    "reportInternational": "国际机构报告",
+    "methodLabel": "分析方法论",
+    "ctaTitle": "开始推演未来",
+    "ctaHint": "需要 Lite 或以上订阅方案",
+    "ctaStart": "启动推演引擎 →",
+    "ctaSubscribe": "查看订阅方案 →"
+  },
+  "launch": {
+    "title": "推演引擎",
+    "subtitle": "上传报告 · 启动未来推演序列",
+    "loginRequired": "请先登录",
+    "loginDesc": "登录后方可使用推演引擎功能。",
+    "loginBtn": "返回首页登录",
+    "gateTitle": "需要订阅方案",
+    "gateDesc": "使用推演引擎需要 Lite 或以上的订阅方案。请升级您的账号以解锁此功能。",
+    "gateBtn": "查看订阅方案"
   },
   "main": {
     "layoutGraph": "图谱",

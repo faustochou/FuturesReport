@@ -67,7 +67,30 @@
     "promptPlaceholder": "// Describe your simulation or prediction requirement in natural language",
     "engineBadge": "Engine: Futures Report-V1.0",
     "startEngine": "Start Engine",
-    "initializing": "Initializing..."
+    "initializing": "Initializing...",
+    "methodologyBadge": "Futurism Research Methodology",
+    "methodologyTitle": "Futures Studies Research Engine",
+    "methodologyDesc": "Grounded in rigorous futures studies methodology — we analyze corporate annual reports, financial statements, government policy documents, and academic research to project complex system trajectories.",
+    "reportTypesLabel": "Supported Report Types",
+    "reportCorporate": "Corporate Annual & Financial Reports",
+    "reportGovernment": "Government Policy Reports",
+    "reportAcademic": "Academic Research Reports",
+    "reportInternational": "International Organization Reports",
+    "methodLabel": "Research Methodology",
+    "ctaTitle": "Begin Futures Simulation",
+    "ctaHint": "Requires Lite subscription or higher",
+    "ctaStart": "Launch Simulation Engine →",
+    "ctaSubscribe": "View Subscription Plans →"
+  },
+  "launch": {
+    "title": "Simulation Engine",
+    "subtitle": "Upload Reports · Launch Futures Simulation",
+    "loginRequired": "Login Required",
+    "loginDesc": "Please log in to access the Simulation Engine.",
+    "loginBtn": "Back to Home",
+    "gateTitle": "Subscription Required",
+    "gateDesc": "The Simulation Engine requires a Lite subscription or higher. Upgrade your account to unlock this feature.",
+    "gateBtn": "View Subscription Plans"
   },
   "main": {
     "layoutGraph": "Graph",

@@ -16,12 +16,12 @@
             <span class="orange-tag">{{ $t('home.tagline') }}</span>
             <span class="version-text">{{ $t('home.version') }}</span>
           </div>
-          
+
           <h1 class="main-title">
             {{ $t('home.heroTitle1') }}<br>
             <span class="gradient-text">{{ $t('home.heroTitle2') }}</span>
           </h1>
-          
+
           <div class="hero-desc">
             <p>
               <i18n-t keypath="home.heroDesc" tag="span">
@@ -34,16 +34,16 @@
               {{ $t('home.slogan') }}<span class="blinking-cursor">_</span>
             </p>
           </div>
-           
+
           <div class="decoration-square"></div>
         </div>
-        
+
         <div class="hero-right">
           <!-- Logo 区域 -->
           <div class="logo-container">
             <AppLogo variant="hero" class="hero-logo" />
           </div>
-          
+
           <button class="scroll-down-btn" @click="scrollToBottom">
             ↓
           </button>
@@ -57,12 +57,12 @@
           <div class="panel-header">
             <span class="status-dot">■</span> {{ $t('home.systemStatus') }}
           </div>
-          
+
           <h2 class="section-title">{{ $t('home.systemReady') }}</h2>
           <p class="section-desc">
             {{ $t('home.systemReadyDesc') }}
           </p>
-          
+
           <!-- 数据指标卡片 -->
           <div class="metrics-row">
             <div class="metric-card">
@@ -75,7 +75,7 @@
             </div>
           </div>
 
-          <!-- 项目模拟步骤介绍 (新增区域) -->
+          <!-- 项目模拟步骤介绍 -->
           <div class="steps-container">
             <div class="steps-header">
                <span class="diamond-icon">◇</span> {{ $t('home.workflowSequence') }}
@@ -120,94 +120,58 @@
           </div>
         </div>
 
-        <!-- 右栏：交互控制台 -->
+        <!-- 右栏：未來學研究方法論 -->
         <div class="right-panel">
-          <div class="console-box">
-            <!-- 上传区域 -->
-            <div class="console-section">
-              <div class="console-header">
-                <span class="console-label">{{ $t('home.realitySeed') }}</span>
-                <span class="console-meta">{{ $t('home.supportedFormats') }}</span>
+          <div class="method-box">
+            <!-- Badge & Title -->
+            <div class="method-badge-row">
+              <span class="method-badge">{{ $t('home.methodologyBadge') }}</span>
+            </div>
+            <h2 class="method-title">{{ $t('home.methodologyTitle') }}</h2>
+            <p class="method-desc">{{ $t('home.methodologyDesc') }}</p>
+
+            <!-- Supported report types -->
+            <div class="method-section-label">
+              <span class="diamond-icon">◇</span> {{ $t('home.reportTypesLabel') }}
+            </div>
+            <div class="report-types-grid">
+              <div class="report-type-card">
+                <span class="report-type-icon">01</span>
+                <span class="report-type-name">{{ $t('home.reportCorporate') }}</span>
               </div>
-              
-              <div 
-                class="upload-zone"
-                :class="{ 'drag-over': isDragOver, 'has-files': files.length > 0 }"
-                @dragover.prevent="handleDragOver"
-                @dragleave.prevent="handleDragLeave"
-                @drop.prevent="handleDrop"
-                @click="triggerFileInput"
-              >
-                <input
-                  ref="fileInput"
-                  type="file"
-                  multiple
-                  accept=".pdf,.md,.txt"
-                  @change="handleFileSelect"
-                  style="display: none"
-                  :disabled="loading"
-                />
-                
-                <div v-if="files.length === 0" class="upload-placeholder">
-                  <div class="upload-icon">↑</div>
-                  <div class="upload-title">{{ $t('home.dragToUpload') }}</div>
-                  <div class="upload-hint">{{ $t('home.orBrowse') }}</div>
-                </div>
-                
-                <div v-else class="file-list">
-                  <div v-for="(file, index) in files" :key="index" class="file-item">
-                    <span class="file-icon">📄</span>
-                    <span class="file-name">{{ file.name }}</span>
-                    <button @click.stop="removeFile(index)" class="remove-btn">×</button>
-                  </div>
-                </div>
+              <div class="report-type-card">
+                <span class="report-type-icon">02</span>
+                <span class="report-type-name">{{ $t('home.reportGovernment') }}</span>
+              </div>
+              <div class="report-type-card">
+                <span class="report-type-icon">03</span>
+                <span class="report-type-name">{{ $t('home.reportAcademic') }}</span>
+              </div>
+              <div class="report-type-card">
+                <span class="report-type-icon">04</span>
+                <span class="report-type-name">{{ $t('home.reportInternational') }}</span>
               </div>
             </div>
 
-            <!-- 分割线 -->
-            <div class="console-divider">
-              <span>{{ $t('home.inputParams') }}</span>
+            <!-- Research methodology tags -->
+            <div class="method-section-label" style="margin-top: 24px;">
+              <span class="diamond-icon">◇</span> {{ $t('home.methodLabel') }}
+            </div>
+            <div class="method-tags">
+              <span class="method-tag">STEEP</span>
+              <span class="method-tag">CLA</span>
+              <span class="method-tag">Futures Cone</span>
+              <span class="method-tag">Scenario Planning</span>
             </div>
 
-            <!-- 输入区域 -->
-            <div class="console-section">
-              <div class="console-header">
-                <span class="console-label">{{ $t('home.simulationPrompt') }}</span>
-              </div>
-              <div class="input-wrapper">
-                <textarea
-                  v-model="formData.simulationRequirement"
-                  class="code-input"
-                  :placeholder="$t('home.promptPlaceholder')"
-                  rows="6"
-                  :disabled="loading"
-                ></textarea>
-                <select
-                  v-if="isConfigured && availableModels.length > 0"
-                  :value="currentModel"
-                  class="model-select"
-                  :disabled="changingModel"
-                  @change="onModelChange"
-                >
-                  <option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option>
-                </select>
-                <select v-else class="model-select model-select--disabled" disabled>
-                  <option>Nexora AI</option>
-                </select>
-              </div>
-            </div>
-
-            <!-- 启动按钮 -->
-            <div class="console-section btn-section">
-              <button 
-                class="start-engine-btn"
-                @click="startSimulation"
-                :disabled="!canSubmit || loading"
-              >
-                <span v-if="!loading">{{ $t('home.startEngine') }}</span>
-                <span v-else>{{ $t('home.initializing') }}</span>
-                <span class="btn-arrow">→</span>
+            <!-- CTA -->
+            <div class="cta-area">
+              <div class="cta-divider"></div>
+              <p class="cta-title">{{ $t('home.ctaTitle') }}</p>
+              <button class="cta-btn" @click="goToLaunch">
+                {{ hasActiveSubscription ? $t('home.ctaStart') : $t('home.ctaSubscribe') }}
               </button>
+              <p v-if="!hasActiveSubscription" class="cta-hint">{{ $t('home.ctaHint') }}</p>
             </div>
           </div>
         </div>
@@ -224,129 +188,25 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
-import { authState, saveLlmConfig } from '../store/auth'
+import { authState } from '../store/auth'
 
 const router = useRouter()
 
-// 表单数据
-const formData = ref({
-  simulationRequirement: ''
+const hasActiveSubscription = computed(() => {
+  const sub = authState.user?.subscription
+  if (!sub) return false
+  return sub.status === 'active' && ['lite', 'premium', 'pro'].includes(sub.tier_code)
 })
 
-// 文件列表
-const files = ref([])
-
-// 状态
-const loading = ref(false)
-const error = ref('')
-const isDragOver = ref(false)
-
-// 文件输入引用
-const fileInput = ref(null)
-
-// 计算属性:是否可以提交
-const canSubmit = computed(() => {
-  return formData.value.simulationRequirement.trim() !== '' && files.value.length > 0
-})
-
-// 引擎模型选择器
-const changingModel = ref(false)
-const isConfigured = computed(() => Boolean(authState.user?.llm_configured))
-const availableModels = computed(() => {
-  const provider = authState.user?.llm?.provider
-  const current = authState.user?.llm?.model
-  if (!provider) return []
-  const list = authState.providers[provider]?.models || []
-  if (list.length === 0 && current) return [current]
-  return list
-})
-const currentModel = computed(() => authState.user?.llm?.model || '')
-
-const onModelChange = async (event) => {
-  const newModel = event.target.value
-  const provider = authState.user?.llm?.provider
-  if (!newModel || !provider) return
-  changingModel.value = true
-  try {
-    await saveLlmConfig({ provider, model: newModel })
-  } catch {
-    // authState.user stays as-is on error
-  } finally {
-    changingModel.value = false
-  }
-}
-
-// 触发文件选择
-const triggerFileInput = () => {
-  if (!loading.value) {
-    fileInput.value?.click()
-  }
-}
-
-// 处理文件选择
-const handleFileSelect = (event) => {
-  const selectedFiles = Array.from(event.target.files)
-  addFiles(selectedFiles)
-}
-
-// 处理拖拽相关
-const handleDragOver = (e) => {
-  if (!loading.value) {
-    isDragOver.value = true
-  }
-}
-
-const handleDragLeave = (e) => {
-  isDragOver.value = false
-}
-
-const handleDrop = (e) => {
-  isDragOver.value = false
-  if (loading.value) return
-  
-  const droppedFiles = Array.from(e.dataTransfer.files)
-  addFiles(droppedFiles)
-}
-
-// 添加文件
-const addFiles = (newFiles) => {
-  const validFiles = newFiles.filter(file => {
-    const ext = file.name.split('.').pop().toLowerCase()
-    return ['pdf', 'md', 'txt'].includes(ext)
-  })
-  files.value.push(...validFiles)
-}
-
-// 移除文件
-const removeFile = (index) => {
-  files.value.splice(index, 1)
-}
-
-// 滚动到底部
 const scrollToBottom = () => {
-  window.scrollTo({
-    top: document.body.scrollHeight,
-    behavior: 'smooth'
-  })
+  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
 }
 
-// 开始模拟 - 立即跳转，API调用在Process页面进行
-const startSimulation = () => {
-  if (!canSubmit.value || loading.value) return
-  
-  // 存储待上传的数据
-  import('../store/pendingUpload.js').then(({ setPendingUpload }) => {
-    setPendingUpload(files.value, formData.value.simulationRequirement)
-    
-    // 立即跳转到Process页面（使用特殊标识表示新建项目）
-    router.push({
-      name: 'Process',
-      params: { projectId: 'new' }
-    })
-  })
+const goToLaunch = () => {
+  router.push(hasActiveSubscription.value ? '/launch' : '/subscription')
 }
 </script>
 
@@ -359,10 +219,6 @@ const startSimulation = () => {
   --gray-light: #F5F5F5;
   --gray-text: #666666;
   --border: #E5E5E5;
-  /* 
-    使用 Space Grotesk 作为主要标题字体，JetBrains Mono 作为代码/标签字体
-    确保已在 index.html 引入这些 Google Fonts 
-  */
   --font-mono: 'JetBrains Mono', monospace;
   --font-sans: 'Space Grotesk', 'Noto Sans SC', system-ui, sans-serif;
   --font-cn: 'Noto Sans SC', system-ui, sans-serif;
@@ -550,7 +406,7 @@ const startSimulation = () => {
 }
 
 .hero-logo {
-  max-width: 500px; /* 调整logo大小 */
+  max-width: 500px;
   width: 100%;
 }
 
@@ -699,227 +555,165 @@ const startSimulation = () => {
   color: var(--gray-text);
 }
 
-/* 右侧交互控制台 */
+/* 右侧：未來學研究方法論 */
 .right-panel {
   flex: 1.2;
 }
 
-.console-box {
-  border: 1px solid #CCC; /* 外部实线 */
-  padding: 8px; /* 内边距形成双重边框感 */
+.method-box {
+  border: 1px solid #CCC;
+  padding: 36px;
 }
 
-.console-section {
-  padding: 20px;
+.method-badge-row {
+  margin-bottom: 16px;
 }
 
-.console-section.btn-section {
-  padding-top: 0;
-}
-
-.console-header {
-  display: flex;
-  justify-content: space-between;
-  margin-bottom: 15px;
+.method-badge {
+  display: inline-block;
+  background: var(--black);
+  color: var(--white);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: #666;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  padding: 4px 12px;
+  text-transform: uppercase;
 }
 
-.upload-zone {
-  border: 1px dashed #CCC;
-  height: 200px;
-  overflow-y: auto;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  transition: all 0.3s;
-  background: #FAFAFA;
+.method-title {
+  font-size: 2rem;
+  font-weight: 520;
+  margin: 0 0 16px 0;
+  line-height: 1.3;
+  letter-spacing: -0.5px;
 }
 
-.upload-zone.has-files {
-  align-items: flex-start;
+.method-desc {
+  font-size: 0.95rem;
+  line-height: 1.8;
+  color: var(--gray-text);
+  margin-bottom: 28px;
 }
 
-.upload-zone:hover {
-  background: #F0F0F0;
-  border-color: #999;
-}
-
-.upload-placeholder {
-  text-align: center;
-}
-
-.upload-icon {
-  width: 40px;
-  height: 40px;
-  border: 1px solid #DDD;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 15px;
-  color: #999;
-}
-
-.upload-title {
-  font-weight: 500;
-  font-size: 0.9rem;
-  margin-bottom: 5px;
-}
-
-.upload-hint {
+/* Section label */
+.method-section-label {
   font-family: var(--font-mono);
   font-size: 0.75rem;
   color: #999;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
 }
 
-.file-list {
-  width: 100%;
-  padding: 15px;
-  display: flex;
-  flex-direction: column;
+/* Report types grid */
+.report-types-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 10px;
 }
 
-.file-item {
+.report-type-card {
+  border: 1px solid var(--border);
+  padding: 14px 16px;
   display: flex;
   align-items: center;
-  background: var(--white);
-  padding: 8px 12px;
-  border: 1px solid #EEE;
-  font-family: var(--font-mono);
-  font-size: 0.85rem;
+  gap: 12px;
+  transition: border-color 0.2s, background 0.2s;
 }
 
-.file-name {
-  flex: 1;
-  margin: 0 10px;
-}
-
-.remove-btn {
-  background: none;
-  border: none;
-  cursor: pointer;
-  font-size: 1.2rem;
-  color: #999;
-}
-
-.console-divider {
-  display: flex;
-  align-items: center;
-  margin: 10px 0;
-}
-
-.console-divider::before,
-.console-divider::after {
-  content: '';
-  flex: 1;
-  height: 1px;
-  background: #EEE;
-}
-
-.console-divider span {
-  padding: 0 15px;
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  color: #BBB;
-  letter-spacing: 1px;
-}
-
-.input-wrapper {
-  position: relative;
-  border: 1px solid #DDD;
+.report-type-card:hover {
+  border-color: var(--black);
   background: #FAFAFA;
 }
 
-.code-input {
-  width: 100%;
-  border: none;
-  background: transparent;
-  padding: 20px;
-  font-family: var(--font-mono);
-  font-size: 0.9rem;
-  line-height: 1.6;
-  resize: vertical;
-  outline: none;
-  min-height: 150px;
-}
-
-.model-select {
-  position: absolute;
-  bottom: 10px;
-  right: 15px;
+.report-type-icon {
   font-family: var(--font-mono);
   font-size: 0.7rem;
-  color: #666;
-  background: transparent;
-  border: none;
-  outline: none;
-  cursor: pointer;
-  max-width: 200px;
-}
-.model-select:hover:not(:disabled) {
-  color: #222;
-}
-.model-select--disabled,
-.model-select:disabled {
-  color: #AAA;
-  cursor: default;
-  -webkit-appearance: none;
-  appearance: none;
-  pointer-events: none;
+  font-weight: 700;
+  color: var(--orange);
+  opacity: 0.8;
+  flex-shrink: 0;
 }
 
-.start-engine-btn {
+.report-type-name {
+  font-size: 0.88rem;
+  font-weight: 500;
+  line-height: 1.3;
+}
+
+/* Methodology tags */
+.method-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.method-tag {
+  border: 1px solid var(--border);
+  padding: 5px 14px;
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: #555;
+  letter-spacing: 0.5px;
+}
+
+/* CTA */
+.cta-area {
+  margin-top: 32px;
+}
+
+.cta-divider {
+  height: 1px;
+  background: var(--border);
+  margin-bottom: 24px;
+}
+
+.cta-title {
+  font-size: 1.1rem;
+  font-weight: 520;
+  margin: 0 0 16px;
+  color: var(--black);
+}
+
+.cta-btn {
   width: 100%;
   background: var(--black);
   color: var(--white);
   border: none;
-  padding: 20px;
+  padding: 18px 24px;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 1.1rem;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+  font-size: 1rem;
   cursor: pointer;
-  transition: all 0.3s ease;
   letter-spacing: 1px;
-  position: relative;
-  overflow: hidden;
-}
-
-/* 可点击状态（非禁用） */
-.start-engine-btn:not(:disabled) {
-  background: var(--black);
-  border: 1px solid var(--black);
+  text-align: left;
+  transition: all 0.3s ease;
   animation: pulse-border 2s infinite;
 }
 
-.start-engine-btn:hover:not(:disabled) {
+.cta-btn:hover {
   background: var(--orange);
-  border-color: var(--orange);
   transform: translateY(-2px);
 }
 
-.start-engine-btn:active:not(:disabled) {
+.cta-btn:active {
   transform: translateY(0);
 }
 
-.start-engine-btn:disabled {
-  background: #E5E5E5;
-  color: #999;
-  cursor: not-allowed;
-  transform: none;
-  border: 1px solid #E5E5E5;
-}
-
-/* 引导动画：微妙的边框脉冲 */
 @keyframes pulse-border {
   0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2); }
   70% { box-shadow: 0 0 0 6px rgba(0, 0, 0, 0); }
   100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+}
+
+.cta-hint {
+  margin-top: 10px;
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: #999;
+  text-align: center;
 }
 
 /* 响应式适配 */
@@ -927,16 +721,16 @@ const startSimulation = () => {
   .dashboard-section {
     flex-direction: column;
   }
-  
+
   .hero-section {
     flex-direction: column;
   }
-  
+
   .hero-left {
     padding-right: 0;
     margin-bottom: 40px;
   }
-  
+
   .hero-logo {
     max-width: 200px;
     margin-bottom: 20px;
@@ -944,6 +738,16 @@ const startSimulation = () => {
 
   .site-footer {
     margin-top: 40px;
+  }
+}
+
+@media (max-width: 600px) {
+  .report-types-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .method-box {
+    padding: 24px;
   }
 }
 </style>

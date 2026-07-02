@@ -1,6 +1,24 @@
 {
   "versions": [
     {
+      "version": "2026-07-02.1",
+      "commit": "pending",
+      "date": "2026-07-02",
+      "title": "Homepage redesign + subscription-gated Simulation Engine page",
+      "summary": "Extracts the simulation console (file upload, prompt, model selector, start engine) into a dedicated /launch page that requires Lite subscription or higher. Redesigns the homepage right panel to showcase the futurism research methodology: corporate annual reports, financial reports, government reports, and academic reports; with STEEP, CLA, Futures Cone, and Scenario Planning method labels.",
+      "added": [
+        "SimulateLaunchView.vue — standalone simulation engine page at /launch with subscription gate UI",
+        "/launch route with requiresSubscription meta flag and beforeEach guard",
+        "Homepage right panel: futurism methodology showcase (report types + methodology tags + CTA button)",
+        "i18n keys: home.methodologyBadge/Title/Desc, home.reportTypes*, home.methodLabel, home.cta*, launch.* (en / zh-TW / zh)"
+      ],
+      "modified": [
+        "Home.vue — right panel replaced with futurism research methodology content and CTA",
+        "router/index.js — added SimulateLaunch route + subscription guard in beforeEach"
+      ],
+      "deleted": []
+    },
+    {
       "version": "2026-07-01.2",
       "commit": "pending",
       "date": "2026-07-01",
