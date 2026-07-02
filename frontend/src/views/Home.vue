@@ -123,55 +123,61 @@
         <!-- 右栏：未來學研究方法論 -->
         <div class="right-panel">
           <div class="method-box">
-            <!-- Badge & Title -->
-            <div class="method-badge-row">
+
+            <!-- Dark header block -->
+            <div class="method-header-block">
               <span class="method-badge">{{ $t('home.methodologyBadge') }}</span>
-            </div>
-            <h2 class="method-title">{{ $t('home.methodologyTitle') }}</h2>
-            <p class="method-desc">{{ $t('home.methodologyDesc') }}</p>
-
-            <!-- Supported report types -->
-            <div class="method-section-label">
-              <span class="diamond-icon">◇</span> {{ $t('home.reportTypesLabel') }}
-            </div>
-            <div class="report-types-grid">
-              <div class="report-type-card">
-                <span class="report-type-icon">01</span>
-                <span class="report-type-name">{{ $t('home.reportCorporate') }}</span>
-              </div>
-              <div class="report-type-card">
-                <span class="report-type-icon">02</span>
-                <span class="report-type-name">{{ $t('home.reportGovernment') }}</span>
-              </div>
-              <div class="report-type-card">
-                <span class="report-type-icon">03</span>
-                <span class="report-type-name">{{ $t('home.reportAcademic') }}</span>
-              </div>
-              <div class="report-type-card">
-                <span class="report-type-icon">04</span>
-                <span class="report-type-name">{{ $t('home.reportInternational') }}</span>
-              </div>
+              <h2 class="method-title">{{ $t('home.methodologyTitle') }}</h2>
+              <p class="method-desc">{{ $t('home.methodologyDesc') }}</p>
             </div>
 
-            <!-- Research methodology tags -->
-            <div class="method-section-label" style="margin-top: 24px;">
-              <span class="diamond-icon">◇</span> {{ $t('home.methodLabel') }}
-            </div>
-            <div class="method-tags">
-              <span class="method-tag">STEEP</span>
-              <span class="method-tag">CLA</span>
-              <span class="method-tag">Futures Cone</span>
-              <span class="method-tag">Scenario Planning</span>
-            </div>
+            <!-- Light body -->
+            <div class="method-body">
 
-            <!-- CTA -->
-            <div class="cta-area">
-              <div class="cta-divider"></div>
-              <p class="cta-title">{{ $t('home.ctaTitle') }}</p>
-              <button class="cta-btn" @click="goToLaunch">
-                {{ hasActiveSubscription ? $t('home.ctaStart') : $t('home.ctaSubscribe') }}
-              </button>
-              <p v-if="!hasActiveSubscription" class="cta-hint">{{ $t('home.ctaHint') }}</p>
+              <!-- Supported report types -->
+              <div class="method-section-label">
+                <span class="section-diamond">◇</span> {{ $t('home.reportTypesLabel') }}
+              </div>
+              <div class="report-types-grid">
+                <div class="report-type-card">
+                  <span class="report-type-num">01</span>
+                  <span class="report-type-name">{{ $t('home.reportCorporate') }}</span>
+                </div>
+                <div class="report-type-card">
+                  <span class="report-type-num">02</span>
+                  <span class="report-type-name">{{ $t('home.reportGovernment') }}</span>
+                </div>
+                <div class="report-type-card">
+                  <span class="report-type-num">03</span>
+                  <span class="report-type-name">{{ $t('home.reportAcademic') }}</span>
+                </div>
+                <div class="report-type-card">
+                  <span class="report-type-num">04</span>
+                  <span class="report-type-name">{{ $t('home.reportInternational') }}</span>
+                </div>
+              </div>
+
+              <!-- Research methodology tags -->
+              <div class="method-section-label">
+                <span class="section-diamond">◇</span> {{ $t('home.methodLabel') }}
+              </div>
+              <div class="method-tags">
+                <span class="method-tag">STEEP</span>
+                <span class="method-tag">CLA</span>
+                <span class="method-tag">Futures Cone</span>
+                <span class="method-tag">Scenario Planning</span>
+              </div>
+
+              <!-- CTA -->
+              <div class="cta-area">
+                <p class="cta-label">{{ $t('home.ctaTitle') }}</p>
+                <button class="cta-btn" @click="goToLaunch">
+                  <span>{{ hasActiveSubscription ? $t('home.ctaStart') : $t('home.ctaSubscribe') }}</span>
+                  <span class="cta-arrow">→</span>
+                </button>
+                <p v-if="!hasActiveSubscription" class="cta-hint">{{ $t('home.ctaHint') }}</p>
+              </div>
+
             </div>
           </div>
         </div>
@@ -561,86 +567,108 @@ const goToLaunch = () => {
 }
 
 .method-box {
-  border: 1px solid #CCC;
-  padding: 36px;
+  border: 1px solid var(--black);
+  overflow: hidden;
 }
 
-.method-badge-row {
-  margin-bottom: 16px;
+/* Dark header block */
+.method-header-block {
+  background: var(--black);
+  padding: 36px 36px 32px;
 }
 
 .method-badge {
   display: inline-block;
-  background: var(--black);
+  background: var(--orange);
   color: var(--white);
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  letter-spacing: 1.5px;
-  padding: 4px 12px;
+  letter-spacing: 2px;
+  padding: 4px 10px;
   text-transform: uppercase;
+  margin-bottom: 22px;
 }
 
 .method-title {
-  font-size: 2rem;
-  font-weight: 520;
-  margin: 0 0 16px 0;
-  line-height: 1.3;
-  letter-spacing: -0.5px;
+  font-size: 2.6rem;
+  font-weight: 500;
+  color: var(--white);
+  margin: 0 0 18px;
+  line-height: 1.2;
+  letter-spacing: -1px;
 }
 
 .method-desc {
-  font-size: 0.95rem;
-  line-height: 1.8;
-  color: var(--gray-text);
-  margin-bottom: 28px;
+  font-size: 0.88rem;
+  line-height: 1.85;
+  color: rgba(255, 255, 255, 0.6);
+  margin: 0;
 }
 
-/* Section label */
+/* Light body */
+.method-body {
+  padding: 30px 32px 32px;
+  background: var(--white);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
 .method-section-label {
   font-family: var(--font-mono);
-  font-size: 0.75rem;
+  font-size: 0.72rem;
   color: #999;
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 14px;
+  margin-bottom: 12px;
+  letter-spacing: 0.5px;
+}
+
+.section-diamond {
+  color: var(--orange);
+  font-size: 0.9rem;
+  line-height: 1;
 }
 
 /* Report types grid */
 .report-types-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 10px;
+  gap: 1px;
+  background: #E0E0E0;
+  border: 1px solid #E0E0E0;
+  margin-bottom: 28px;
 }
 
 .report-type-card {
-  border: 1px solid var(--border);
-  padding: 14px 16px;
+  background: var(--white);
+  padding: 18px 20px;
   display: flex;
-  align-items: center;
-  gap: 12px;
-  transition: border-color 0.2s, background 0.2s;
+  flex-direction: column;
+  gap: 6px;
+  transition: background 0.2s;
+  cursor: default;
 }
 
 .report-type-card:hover {
-  border-color: var(--black);
-  background: #FAFAFA;
+  background: #F5F5F5;
 }
 
-.report-type-icon {
+.report-type-num {
   font-family: var(--font-mono);
-  font-size: 0.7rem;
+  font-size: 0.65rem;
   font-weight: 700;
   color: var(--orange);
-  opacity: 0.8;
-  flex-shrink: 0;
+  letter-spacing: 1px;
 }
 
 .report-type-name {
-  font-size: 0.88rem;
-  font-weight: 500;
-  line-height: 1.3;
+  font-size: 0.9rem;
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--black);
 }
 
 /* Methodology tags */
@@ -648,53 +676,57 @@ const goToLaunch = () => {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  margin-bottom: 28px;
 }
 
 .method-tag {
-  border: 1px solid var(--border);
-  padding: 5px 14px;
+  background: var(--black);
+  color: var(--white);
   font-family: var(--font-mono);
-  font-size: 0.75rem;
-  color: #555;
-  letter-spacing: 0.5px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  letter-spacing: 0.8px;
+  transition: background 0.2s;
+}
+
+.method-tag:hover {
+  background: #333;
 }
 
 /* CTA */
 .cta-area {
-  margin-top: 32px;
+  border-top: 1px solid var(--border);
+  padding-top: 24px;
 }
 
-.cta-divider {
-  height: 1px;
-  background: var(--border);
-  margin-bottom: 24px;
-}
-
-.cta-title {
-  font-size: 1.1rem;
-  font-weight: 520;
-  margin: 0 0 16px;
+.cta-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  margin: 0 0 14px;
   color: var(--black);
+  letter-spacing: 0.3px;
 }
 
 .cta-btn {
   width: 100%;
-  background: var(--black);
+  background: var(--orange);
   color: var(--white);
   border: none;
   padding: 18px 24px;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 1rem;
+  font-size: 0.95rem;
   cursor: pointer;
   letter-spacing: 1px;
-  text-align: left;
-  transition: all 0.3s ease;
-  animation: pulse-border 2s infinite;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: background 0.25s ease, transform 0.2s ease;
 }
 
 .cta-btn:hover {
-  background: var(--orange);
+  background: #d93d00;
   transform: translateY(-2px);
 }
 
@@ -702,18 +734,22 @@ const goToLaunch = () => {
   transform: translateY(0);
 }
 
-@keyframes pulse-border {
-  0% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0.2); }
-  70% { box-shadow: 0 0 0 6px rgba(0, 0, 0, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(0, 0, 0, 0); }
+.cta-arrow {
+  font-size: 1.1rem;
+  transition: transform 0.2s;
+}
+
+.cta-btn:hover .cta-arrow {
+  transform: translateX(4px);
 }
 
 .cta-hint {
   margin-top: 10px;
   font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: #999;
+  font-size: 0.68rem;
+  color: #AAA;
   text-align: center;
+  letter-spacing: 0.3px;
 }
 
 /* 响应式适配 */
