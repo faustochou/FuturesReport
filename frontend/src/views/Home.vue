@@ -124,10 +124,9 @@
         <div class="right-panel">
           <div class="method-box">
 
-            <!-- Header: badge + title + description -->
+            <!-- Header: title + description -->
             <div class="method-header">
               <div class="method-header-top">
-                <span class="method-badge">{{ $t('home.methodologyBadge') }}</span>
                 <span class="method-status-dot"></span>
               </div>
               <h2 class="method-title">{{ $t('home.methodologyTitle') }}</h2>
@@ -197,17 +196,8 @@
 
             <div class="method-rule"></div>
 
-            <!-- Methodology strip + CTA -->
+            <!-- CTA -->
             <div class="method-footer">
-              <div class="method-strip">
-                <span class="method-strip-item">STEEP</span>
-                <span class="method-strip-sep">·</span>
-                <span class="method-strip-item">CLA</span>
-                <span class="method-strip-sep">·</span>
-                <span class="method-strip-item">Futures Cone</span>
-                <span class="method-strip-sep">·</span>
-                <span class="method-strip-item">Scenarios</span>
-              </div>
               <button class="cta-btn" @click="goToLaunch">
                 <span>{{ hasActiveSubscription ? $t('home.ctaStart') : $t('home.ctaSubscribe') }}</span>
                 <span class="cta-arrow">→</span>
@@ -768,8 +758,8 @@ const goToLaunch = () => {
 
 .cta-btn {
   width: 100%;
-  background: var(--orange);
-  color: var(--white);
+  background: var(--white);
+  color: var(--black);
   border: none;
   padding: 17px 22px;
   font-family: var(--font-mono);
@@ -780,11 +770,12 @@ const goToLaunch = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: background 0.25s, transform 0.18s;
+  transition: background 0.25s, color 0.25s, transform 0.18s;
 }
 
 .cta-btn:hover {
-  background: #D93D00;
+  background: #16e77f;
+  color: var(--black);
   transform: translateY(-2px);
 }
 
