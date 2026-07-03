@@ -124,61 +124,97 @@
         <div class="right-panel">
           <div class="method-box">
 
-            <!-- Dark header block -->
-            <div class="method-header-block">
-              <span class="method-badge">{{ $t('home.methodologyBadge') }}</span>
+            <!-- Header: badge + title + description -->
+            <div class="method-header">
+              <div class="method-header-top">
+                <span class="method-badge">{{ $t('home.methodologyBadge') }}</span>
+                <span class="method-status-dot"></span>
+              </div>
               <h2 class="method-title">{{ $t('home.methodologyTitle') }}</h2>
               <p class="method-desc">{{ $t('home.methodologyDesc') }}</p>
             </div>
 
-            <!-- Light body -->
-            <div class="method-body">
+            <div class="method-rule"></div>
 
-              <!-- Supported report types -->
-              <div class="method-section-label">
-                <span class="section-diamond">◇</span> {{ $t('home.reportTypesLabel') }}
-              </div>
-              <div class="report-types-grid">
-                <div class="report-type-card">
-                  <span class="report-type-num">01</span>
-                  <span class="report-type-name">{{ $t('home.reportCorporate') }}</span>
+            <!-- Report types: icon list -->
+            <div class="report-list">
+              <div class="report-item">
+                <div class="report-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
+                    <rect x="9" y="3" width="6" height="4" rx="1.5"/>
+                    <polyline points="7 13 10 16 17 11"/>
+                  </svg>
                 </div>
-                <div class="report-type-card">
-                  <span class="report-type-num">02</span>
-                  <span class="report-type-name">{{ $t('home.reportGovernment') }}</span>
+                <div class="report-text">
+                  <span class="report-name">{{ $t('home.reportCorporate') }}</span>
+                  <span class="report-sub">Annual &amp; Financial Reports</span>
                 </div>
-                <div class="report-type-card">
-                  <span class="report-type-num">03</span>
-                  <span class="report-type-name">{{ $t('home.reportAcademic') }}</span>
+                <span class="report-num">01</span>
+              </div>
+              <div class="report-item">
+                <div class="report-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M3 21h18M3 10h18M12 3 3 10h18L12 3z"/>
+                    <path d="M9 21v-5h6v5"/>
+                  </svg>
                 </div>
-                <div class="report-type-card">
-                  <span class="report-type-num">04</span>
-                  <span class="report-type-name">{{ $t('home.reportInternational') }}</span>
+                <div class="report-text">
+                  <span class="report-name">{{ $t('home.reportGovernment') }}</span>
+                  <span class="report-sub">Government &amp; Policy Reports</span>
                 </div>
+                <span class="report-num">02</span>
               </div>
-
-              <!-- Research methodology tags -->
-              <div class="method-section-label">
-                <span class="section-diamond">◇</span> {{ $t('home.methodLabel') }}
+              <div class="report-item">
+                <div class="report-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <path d="M12 14 3 9l9-5 9 5-9 5z"/>
+                    <path d="M3 9v6l9 5 9-5V9"/>
+                    <line x1="12" y1="14" x2="12" y2="19"/>
+                  </svg>
+                </div>
+                <div class="report-text">
+                  <span class="report-name">{{ $t('home.reportAcademic') }}</span>
+                  <span class="report-sub">Academic Research Papers</span>
+                </div>
+                <span class="report-num">03</span>
               </div>
-              <div class="method-tags">
-                <span class="method-tag">STEEP</span>
-                <span class="method-tag">CLA</span>
-                <span class="method-tag">Futures Cone</span>
-                <span class="method-tag">Scenario Planning</span>
+              <div class="report-item">
+                <div class="report-icon">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9"/>
+                    <path d="M3.6 9h16.8M3.6 15h16.8"/>
+                    <path d="M12 3c-2.4 3-3.6 5.8-3.6 9s1.2 6 3.6 9M12 3c2.4 3 3.6 5.8 3.6 9s-1.2 6-3.6 9"/>
+                  </svg>
+                </div>
+                <div class="report-text">
+                  <span class="report-name">{{ $t('home.reportInternational') }}</span>
+                  <span class="report-sub">International Organizations</span>
+                </div>
+                <span class="report-num">04</span>
               </div>
-
-              <!-- CTA -->
-              <div class="cta-area">
-                <p class="cta-label">{{ $t('home.ctaTitle') }}</p>
-                <button class="cta-btn" @click="goToLaunch">
-                  <span>{{ hasActiveSubscription ? $t('home.ctaStart') : $t('home.ctaSubscribe') }}</span>
-                  <span class="cta-arrow">→</span>
-                </button>
-                <p v-if="!hasActiveSubscription" class="cta-hint">{{ $t('home.ctaHint') }}</p>
-              </div>
-
             </div>
+
+            <div class="method-rule"></div>
+
+            <!-- Methodology strip + CTA -->
+            <div class="method-footer">
+              <div class="method-strip">
+                <span class="method-strip-item">STEEP</span>
+                <span class="method-strip-sep">·</span>
+                <span class="method-strip-item">CLA</span>
+                <span class="method-strip-sep">·</span>
+                <span class="method-strip-item">Futures Cone</span>
+                <span class="method-strip-sep">·</span>
+                <span class="method-strip-item">Scenarios</span>
+              </div>
+              <button class="cta-btn" @click="goToLaunch">
+                <span>{{ hasActiveSubscription ? $t('home.ctaStart') : $t('home.ctaSubscribe') }}</span>
+                <span class="cta-arrow">→</span>
+              </button>
+              <p v-if="!hasActiveSubscription" class="cta-hint">{{ $t('home.ctaHint') }}</p>
+            </div>
+
           </div>
         </div>
       </section>
@@ -561,151 +597,173 @@ const goToLaunch = () => {
   color: var(--gray-text);
 }
 
-/* 右侧：未來學研究方法論 */
+/* 右侧：未來學研究方法論 — 全黑暗主題 */
 .right-panel {
   flex: 1.2;
 }
 
 .method-box {
-  border: 1px solid var(--black);
+  background: #0A0A0A;
+  border: 1px solid #1C1C1C;
   overflow: hidden;
 }
 
-/* Dark header block */
-.method-header-block {
-  background: var(--black);
-  padding: 36px 36px 32px;
+/* ── Header ── */
+.method-header {
+  padding: 36px 36px 30px;
 }
 
-.method-badge {
-  display: inline-block;
-  background: var(--orange);
-  color: var(--white);
-  font-family: var(--font-mono);
-  font-size: 0.68rem;
-  font-weight: 700;
-  letter-spacing: 2px;
-  padding: 4px 10px;
-  text-transform: uppercase;
+.method-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   margin-bottom: 22px;
 }
 
+.method-badge {
+  font-family: var(--font-mono);
+  font-size: 0.65rem;
+  font-weight: 700;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.35);
+}
+
+.method-status-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--orange);
+  box-shadow: 0 0 8px rgba(255, 69, 0, 0.7);
+  animation: dot-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes dot-pulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(255,69,0,0.7); }
+  50%       { opacity: 0.5; box-shadow: 0 0 2px rgba(255,69,0,0.3); }
+}
+
 .method-title {
-  font-size: 2.6rem;
+  font-size: 2.5rem;
   font-weight: 500;
-  color: var(--white);
-  margin: 0 0 18px;
+  color: #FFFFFF;
+  margin: 0 0 16px;
   line-height: 1.2;
-  letter-spacing: -1px;
+  letter-spacing: -1.2px;
 }
 
 .method-desc {
-  font-size: 0.88rem;
-  line-height: 1.85;
-  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.84rem;
+  line-height: 1.9;
+  color: rgba(255, 255, 255, 0.42);
   margin: 0;
 }
 
-/* Light body */
-.method-body {
-  padding: 30px 32px 32px;
-  background: var(--white);
-  display: flex;
-  flex-direction: column;
-  gap: 0;
+/* ── Divider ── */
+.method-rule {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 0 36px;
 }
 
-.method-section-label {
-  font-family: var(--font-mono);
-  font-size: 0.72rem;
-  color: #999;
+/* ── Report list ── */
+.report-list {
+  padding: 6px 36px;
+}
+
+.report-item {
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 12px;
-  letter-spacing: 0.5px;
-}
-
-.section-diamond {
-  color: var(--orange);
-  font-size: 0.9rem;
-  line-height: 1;
-}
-
-/* Report types grid */
-.report-types-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 1px;
-  background: #E0E0E0;
-  border: 1px solid #E0E0E0;
-  margin-bottom: 28px;
-}
-
-.report-type-card {
-  background: var(--white);
-  padding: 18px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  gap: 18px;
+  padding: 17px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
   transition: background 0.2s;
   cursor: default;
 }
 
-.report-type-card:hover {
-  background: #F5F5F5;
+.report-item:last-child {
+  border-bottom: none;
 }
 
-.report-type-num {
+.report-item:hover .report-icon {
+  color: var(--orange);
+}
+
+.report-item:hover .report-name {
+  color: #FFFFFF;
+}
+
+.report-icon {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  color: rgba(255, 255, 255, 0.3);
+  transition: color 0.25s;
+}
+
+.report-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.report-text {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.report-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.82);
+  line-height: 1.3;
+  transition: color 0.25s;
+}
+
+.report-sub {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.22);
+  letter-spacing: 0.5px;
+}
+
+.report-num {
+  font-family: var(--font-mono);
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.15);
+  letter-spacing: 1px;
+  flex-shrink: 0;
+}
+
+/* ── Footer: methodology strip + CTA ── */
+.method-footer {
+  padding: 20px 36px 32px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.method-strip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+
+.method-strip-item {
   font-family: var(--font-mono);
   font-size: 0.65rem;
   font-weight: 700;
-  color: var(--orange);
-  letter-spacing: 1px;
+  color: rgba(255, 255, 255, 0.28);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
 }
 
-.report-type-name {
-  font-size: 0.9rem;
-  font-weight: 600;
-  line-height: 1.4;
-  color: var(--black);
-}
-
-/* Methodology tags */
-.method-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 28px;
-}
-
-.method-tag {
-  background: var(--black);
-  color: var(--white);
-  font-family: var(--font-mono);
-  font-size: 0.7rem;
-  font-weight: 700;
-  padding: 6px 14px;
-  letter-spacing: 0.8px;
-  transition: background 0.2s;
-}
-
-.method-tag:hover {
-  background: #333;
-}
-
-/* CTA */
-.cta-area {
-  border-top: 1px solid var(--border);
-  padding-top: 24px;
-}
-
-.cta-label {
-  font-size: 0.85rem;
-  font-weight: 600;
-  margin: 0 0 14px;
-  color: var(--black);
-  letter-spacing: 0.3px;
+.method-strip-sep {
+  color: rgba(255, 255, 255, 0.12);
+  font-size: 0.75rem;
+  line-height: 1;
 }
 
 .cta-btn {
@@ -713,20 +771,20 @@ const goToLaunch = () => {
   background: var(--orange);
   color: var(--white);
   border: none;
-  padding: 18px 24px;
+  padding: 17px 22px;
   font-family: var(--font-mono);
   font-weight: 700;
-  font-size: 0.95rem;
+  font-size: 0.88rem;
   cursor: pointer;
   letter-spacing: 1px;
   display: flex;
   justify-content: space-between;
   align-items: center;
-  transition: background 0.25s ease, transform 0.2s ease;
+  transition: background 0.25s, transform 0.18s;
 }
 
 .cta-btn:hover {
-  background: #d93d00;
+  background: #D93D00;
   transform: translateY(-2px);
 }
 
@@ -735,21 +793,21 @@ const goToLaunch = () => {
 }
 
 .cta-arrow {
-  font-size: 1.1rem;
+  font-size: 1rem;
   transition: transform 0.2s;
 }
 
 .cta-btn:hover .cta-arrow {
-  transform: translateX(4px);
+  transform: translateX(5px);
 }
 
 .cta-hint {
-  margin-top: 10px;
+  margin-top: 11px;
   font-family: var(--font-mono);
-  font-size: 0.68rem;
-  color: #AAA;
+  font-size: 0.62rem;
+  color: rgba(255, 255, 255, 0.2);
   text-align: center;
-  letter-spacing: 0.3px;
+  letter-spacing: 0.5px;
 }
 
 /* 响应式适配 */
@@ -778,12 +836,12 @@ const goToLaunch = () => {
 }
 
 @media (max-width: 600px) {
-  .report-types-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .method-box {
-    padding: 24px;
+  .method-header,
+  .report-list,
+  .method-rule,
+  .method-footer {
+    padding-left: 24px;
+    padding-right: 24px;
   }
 }
 </style>
