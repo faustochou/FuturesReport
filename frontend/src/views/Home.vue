@@ -758,8 +758,8 @@ const goToLaunch = () => {
 
 .cta-btn {
   width: 100%;
-  background: var(--white);
-  color: var(--black);
+  background: #FFFFFF;
+  color: #000000;
   border: none;
   padding: 17px 22px;
   font-family: var(--font-mono);
@@ -775,7 +775,7 @@ const goToLaunch = () => {
 
 .cta-btn:hover {
   background: #16e77f;
-  color: var(--black);
+  color: #000000;
   transform: translateY(-2px);
 }
 
