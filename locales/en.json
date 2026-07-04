@@ -79,8 +79,8 @@
     "methodLabel": "Research Methodology",
     "ctaTitle": "Begin Futures Simulation",
     "ctaHint": "Requires Lite subscription or higher",
-    "ctaStart": "Launch Simulation Engine →",
-    "ctaSubscribe": "View Subscription Plans →"
+    "ctaStart": "Launch Simulation Engine",
+    "ctaSubscribe": "View Subscription Plans"
   },
   "launch": {
     "title": "Simulation Engine",

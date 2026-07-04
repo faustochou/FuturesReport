@@ -3,8 +3,13 @@
 Step2: Zep实体读取与过滤、OASIS模拟准备与运行（全程自动化）
 """
 
+import csv
+import json
 import os
+import sqlite3
+import threading
 import traceback
+from datetime import datetime
 from flask import request, jsonify, send_file
 
 from . import simulation_bp
@@ -17,6 +22,7 @@ from ..utils.auth import get_current_llm_config, require_auth, require_llm_confi
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
 from ..models.project import ProjectManager
+from ..models.task import TaskManager, TaskStatus
 
 logger = get_logger('futuresreport.api.simulation')
 
@@ -254,9 +260,6 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     Returns:
         (is_prepared: bool, info: dict)
     """
-    import os
-    from ..config import Config
-    
     simulation_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
     
     # 检查目录是否存在
@@ -291,7 +294,6 @@ def _check_simulation_prepared(simulation_id: str) -> tuple:
     # 检查state.json中的状态
     state_file = os.path.join(simulation_dir, "state.json")
     try:
-        import json
         with open(state_file, 'r', encoding='utf-8') as f:
             state_data = json.load(f)
         
@@ -400,15 +402,10 @@ def prepare_simulation():
             }
         }
     """
-    import threading
-    import os
-    from ..models.task import TaskManager, TaskStatus
-    from ..config import Config
-    
     try:
         data = request.get_json() or {}
         llm_config = get_current_llm_config()
-        
+
         simulation_id = data.get('simulation_id')
         if not simulation_id:
             return jsonify({
@@ -689,14 +686,12 @@ def get_prepare_status():
             }
         }
     """
-    from ..models.task import TaskManager
-    
     try:
         data = request.get_json() or {}
-        
+
         task_id = data.get('task_id')
         simulation_id = data.get('simulation_id')
-        
+
         # 如果提供了simulation_id，先检查是否已准备完成
         if simulation_id:
             is_prepared, prepare_info = _check_simulation_prepared(simulation_id)
@@ -849,9 +844,6 @@ def _get_report_id_for_simulation(simulation_id: str) -> str:
     Returns:
         report_id 或 None
     """
-    import json
-    from datetime import datetime
-    
     # reports 目录路径：backend/uploads/reports
     # __file__ 是 app/api/simulation.py，需要向上两级到 backend/
     reports_dir = os.path.join(os.path.dirname(__file__), '../../uploads/reports')
@@ -1075,10 +1067,6 @@ def get_simulation_profiles_realtime(simulation_id: str):
             }
         }
     """
-    import json
-    import csv
-    from datetime import datetime
-    
     try:
         platform = request.args.get('platform', 'reddit')
         
@@ -1181,9 +1169,6 @@ def get_simulation_config_realtime(simulation_id: str):
             }
         }
     """
-    import json
-    from datetime import datetime
-    
     try:
         # 获取模拟目录
         sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
@@ -2056,8 +2041,7 @@ def get_simulation_posts(simulation_id: str):
                     "message": t('api.dbNotExist')
                 }
             })
-        
-        import sqlite3
+
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
@@ -2129,8 +2113,7 @@ def get_simulation_comments(simulation_id: str):
                     "comments": []
                 }
             })
-        
-        import sqlite3
+
         conn = sqlite3.connect(db_path)
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()

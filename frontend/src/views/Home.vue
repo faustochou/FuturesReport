@@ -676,7 +676,7 @@ const goToLaunch = () => {
 }
 
 .report-item:hover .report-icon {
-  color: var(--orange);
+  color: #16e77f;
 }
 
 .report-item:hover .report-name {
