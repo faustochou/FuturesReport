@@ -18,7 +18,7 @@ from ..services.zep_entity_reader import ZepEntityReader
 from ..services.oasis_profile_generator import OasisProfileGenerator
 from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
-from ..utils.auth import get_current_llm_config, require_auth, require_llm_config
+from ..utils.auth import current_user, get_current_llm_config, require_auth, require_llm_config
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
 from ..models.project import ProjectManager
