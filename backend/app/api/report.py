@@ -4,8 +4,10 @@ Report API路由
 """
 
 import os
+import tempfile
 import traceback
 import threading
+import uuid
 from flask import request, jsonify, send_file
 
 from . import report_bp
@@ -112,7 +114,6 @@ def generate_report():
             }), 400
         
         # 提前生成 report_id，以便立即返回给前端
-        import uuid
         report_id = f"report_{uuid.uuid4().hex[:12]}"
         
         # 创建异步任务
@@ -426,7 +427,6 @@ def download_report(report_id: str):
         
         if not os.path.exists(md_path):
             # 如果MD文件不存在，生成一个临时文件
-            import tempfile
             with tempfile.NamedTemporaryFile(mode='w', suffix='.md', delete=False) as f:
                 f.write(report.markdown_content)
                 temp_path = f.name
