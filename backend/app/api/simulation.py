@@ -1634,6 +1634,26 @@ def start_simulation():
         state.last_checkpoint_round = getattr(run_state, 'last_checkpoint_round', state.current_round)
         state.agent_count = state.profiles_count or state.entities_count
         manager._save_simulation_state(state)
+
+        # 寫入推演記錄（不影響推演引擎，異常只 warning）
+        try:
+            _rec_user = current_user()
+            if _rec_user:
+                _rec_project = ProjectManager.get_project(state.project_id)
+                _rec_title = (_rec_project.simulation_requirement or "")[:100] if _rec_project else ""
+                _rec_files = [
+                    f.get("filename") or f.get("original_filename", "")
+                    for f in (_rec_project.files or [])
+                ] if _rec_project else []
+                _write_simulation_record(
+                    user_id=_rec_user["user_id"],
+                    simulation_id=simulation_id,
+                    project_id=state.project_id,
+                    title=_rec_title,
+                    report_filenames=_rec_files,
+                )
+        except Exception as _rec_exc:
+            logger.warning(f"推演記錄寫入失敗（不影響推演）: {_rec_exc}")
         
         response_data = run_state.to_dict()
         if max_rounds:
@@ -1694,14 +1714,20 @@ def stop_simulation():
             }), 400
         
         run_state = SimulationRunner.stop_simulation(simulation_id)
-        
+
         # 更新模拟状态
         manager = SimulationManager()
         state = manager.get_simulation(simulation_id)
         if state:
             state.status = SimulationStatus.PAUSED
             manager._save_simulation_state(state)
-        
+
+        # 手動停止 → 推演記錄標記為 failed
+        try:
+            _finalize_simulation_record(simulation_id, "failed")
+        except Exception as _exc:
+            logger.warning(f"停止推演：記錄狀態更新失敗: {_exc}")
+
         return jsonify({
             "success": True,
             "data": run_state.to_dict()
@@ -1767,7 +1793,19 @@ def get_run_status(simulation_id: str):
                     "total_actions_count": 0,
                 }
             })
-        
+
+        # Lazy finalization：若已完成/失敗，同步推演記錄狀態
+        if run_state.runner_status in (RunnerStatus.COMPLETED, RunnerStatus.FAILED):
+            try:
+                _fin_status = "completed" if run_state.runner_status == RunnerStatus.COMPLETED else "failed"
+                _fin_completed_at = (
+                    datetime.fromisoformat(run_state.completed_at)
+                    if run_state.completed_at else None
+                )
+                _finalize_simulation_record(simulation_id, _fin_status, _fin_completed_at)
+            except Exception as _fin_exc:
+                logger.warning(f"推演記錄狀態同步失敗: {_fin_exc}")
+
         return jsonify({
             "success": True,
             "data": run_state.to_dict()
@@ -2734,3 +2772,170 @@ def close_simulation_env():
             "error": str(e),
             "traceback": traceback.format_exc()
         }), 500
+
+
+# ============== 推演記錄持久化 ==============
+
+def _write_simulation_record(
+    user_id: str,
+    simulation_id: str,
+    project_id,
+    title: str,
+    report_filenames: list,
+) -> None:
+    """Create or upsert a SimulationRecord row (keyed by simulation_id)."""
+    from sqlalchemy import select
+    from ..db.database import get_db
+    from ..db.models import SimulationRecord
+
+    now = datetime.utcnow()
+    with get_db() as db:
+        existing = db.execute(
+            select(SimulationRecord).where(SimulationRecord.simulation_id == simulation_id)
+        ).scalar_one_or_none()
+        if existing:
+            existing.user_id = user_id
+            existing.title = title
+            existing.report_filenames = report_filenames
+        else:
+            db.add(SimulationRecord(
+                user_id=user_id,
+                simulation_id=simulation_id,
+                project_id=project_id,
+                title=title,
+                report_filenames=report_filenames,
+                started_at=now,
+                status="running",
+                created_at=now,
+            ))
+
+
+def _finalize_simulation_record(simulation_id: str, status: str, completed_at=None) -> None:
+    """Update status to 'completed' or 'failed' if the record is still 'running'."""
+    from sqlalchemy import select
+    from ..db.database import get_db
+    from ..db.models import SimulationRecord
+
+    with get_db() as db:
+        record = db.execute(
+            select(SimulationRecord).where(SimulationRecord.simulation_id == simulation_id)
+        ).scalar_one_or_none()
+        if record and record.status == "running":
+            record.status = status
+            record.completed_at = completed_at or datetime.utcnow()
+
+
+@simulation_bp.route('/records', methods=['GET'])
+@require_auth
+def list_simulation_records():
+    """
+    查詢推演記錄列表（按登入使用者過濾；admin 可看全部）
+
+    Query 參數:
+        limit:  每頁數量（預設 20，最大 100）
+        offset: 跳過筆數（分頁用，預設 0）
+
+    同時執行 lazy cleanup：刪除 started_at 早於 30 天前的記錄。
+    """
+    try:
+        from datetime import timedelta
+        from sqlalchemy import select, func
+        from ..db.database import get_db
+        from ..db.models import SimulationRecord
+
+        limit = min(request.args.get('limit', 20, type=int), 100)
+        offset = request.args.get('offset', 0, type=int)
+        user = current_user()
+
+        with get_db() as db:
+            # Lazy cleanup — 30 天前的記錄一併刪除
+            cutoff = datetime.utcnow() - timedelta(days=30)
+            db.execute(
+                SimulationRecord.__table__.delete().where(
+                    SimulationRecord.started_at < cutoff
+                )
+            )
+
+            is_admin = user.get("role") == "admin"
+            base_q = select(SimulationRecord)
+            if not is_admin:
+                base_q = base_q.where(SimulationRecord.user_id == user["user_id"])
+            base_q = base_q.order_by(SimulationRecord.started_at.desc())
+
+            total = db.execute(
+                select(func.count()).select_from(base_q.subquery())
+            ).scalar_one()
+            records = db.execute(base_q.offset(offset).limit(limit)).scalars().all()
+
+            def _to_dict(r):
+                filenames = r.report_filenames if isinstance(r.report_filenames, list) else []
+                return {
+                    "id": r.id,
+                    "simulation_id": r.simulation_id,
+                    "project_id": r.project_id,
+                    "title": r.title,
+                    "report_filenames": filenames,
+                    "started_at": r.started_at.isoformat() if r.started_at else None,
+                    "completed_at": r.completed_at.isoformat() if r.completed_at else None,
+                    "status": r.status,
+                    "result_summary": r.result_summary,
+                    "result_url": r.result_url,
+                    "report_id": _get_report_id_for_simulation(r.simulation_id),
+                }
+
+            return jsonify({
+                "success": True,
+                "data": [_to_dict(r) for r in records],
+                "total": total,
+                "count": len(records),
+                "offset": offset,
+                "limit": limit,
+            })
+
+    except Exception as e:
+        logger.error(f"查詢推演記錄失敗: {e}")
+        return jsonify({"success": False, "error": str(e), "traceback": traceback.format_exc()}), 500
+
+
+@simulation_bp.route('/records/<int:record_id>', methods=['GET'])
+@require_auth
+def get_simulation_record(record_id: int):
+    """
+    查詢單筆推演記錄。
+    一般使用者只能看自己的記錄；admin 可看任意記錄。
+    """
+    try:
+        from sqlalchemy import select
+        from ..db.database import get_db
+        from ..db.models import SimulationRecord
+
+        user = current_user()
+        with get_db() as db:
+            record = db.execute(
+                select(SimulationRecord).where(SimulationRecord.id == record_id)
+            ).scalar_one_or_none()
+            if not record:
+                return jsonify({"success": False, "error": "Record not found"}), 404
+            if record.user_id != user["user_id"] and user.get("role") != "admin":
+                return jsonify({"success": False, "error": "Access denied"}), 403
+
+            filenames = record.report_filenames if isinstance(record.report_filenames, list) else []
+            return jsonify({
+                "success": True,
+                "data": {
+                    "id": record.id,
+                    "simulation_id": record.simulation_id,
+                    "project_id": record.project_id,
+                    "title": record.title,
+                    "report_filenames": filenames,
+                    "started_at": record.started_at.isoformat() if record.started_at else None,
+                    "completed_at": record.completed_at.isoformat() if record.completed_at else None,
+                    "status": record.status,
+                    "result_summary": record.result_summary,
+                    "result_url": record.result_url,
+                    "report_id": _get_report_id_for_simulation(record.simulation_id),
+                }
+            })
+    except Exception as e:
+        logger.error(f"查詢單筆推演記錄失敗: {e}")
+        return jsonify({"success": False, "error": str(e)}), 500

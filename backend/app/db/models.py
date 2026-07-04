@@ -82,6 +82,12 @@ class User(Base):
         cascade="all, delete-orphan",
         lazy="joined",
     )
+    simulation_records: Mapped[List["SimulationRecord"]] = relationship(
+        "SimulationRecord",
+        back_populates="user",
+        cascade="all, delete-orphan",
+        lazy="select",
+    )
 
     def touch(self) -> None:
         self.updated_at = datetime.utcnow()
@@ -189,3 +195,34 @@ class UserSubscription(Base):
 
     def touch(self) -> None:
         self.updated_at = datetime.utcnow()
+
+
+# ---------------------------------------------------------------------------
+# SimulationRecord  (one row per simulation run, tied to the user who started it)
+# ---------------------------------------------------------------------------
+
+class SimulationRecord(Base):
+    """Persistent log of every simulation run. Kept for 30 days then purged."""
+    __tablename__ = "simulation_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    simulation_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
+    project_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
+    title: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    # Stored as JSON array of filename strings, e.g. ["report.pdf", "data.txt"]
+    report_filenames: Mapped[Any] = mapped_column(_JsonColumn, nullable=False, default=list)
+    started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    # "running" | "completed" | "failed"
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")
+    result_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    result_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+
+    user: Mapped["User"] = relationship("User", back_populates="simulation_records")
