@@ -756,8 +756,6 @@ const fetchGraphData = async () => {
         const newNodeCount = newData.node_count || newData.nodes?.length || 0
         const oldNodeCount = graphData.value?.node_count || graphData.value?.nodes?.length || 0
         
-        console.log('Fetching graph data, nodes:', newNodeCount, 'edges:', newData.edge_count || newData.edges?.length || 0)
-        
         // 数据有变化时更新渲染
         if (newNodeCount !== oldNodeCount || !graphData.value) {
           graphData.value = newData
@@ -766,8 +764,8 @@ const fetchGraphData = async () => {
         }
       }
     }
-  } catch (err) {
-    console.log('Graph data fetch:', err.message || 'not ready')
+  } catch {
+    // graph data not ready yet — silently ignore
   }
 }
 
@@ -796,11 +794,7 @@ const pollTaskStatus = async (taskId) => {
         message: task.message || '处理中...'
       }
       
-      console.log('Task status:', task.status, 'Progress:', task.progress)
-      
       if (task.status === 'completed') {
-        console.log('✅ 图谱构建完成，正在加载完整数据...')
-        
         stopPolling()
         stopGraphPolling()
         currentPhase.value = 2
@@ -818,9 +812,7 @@ const pollTaskStatus = async (taskId) => {
           
           // 最终加载完整图谱数据
           if (projectResponse.data.graph_id) {
-            console.log('📊 加载完整图谱:', projectResponse.data.graph_id)
             await loadGraph(projectResponse.data.graph_id)
-            console.log('✅ 图谱加载完成')
           }
         }
         
@@ -866,27 +858,22 @@ const loadGraph = async (graphId) => {
 // 渲染图谱 (D3.js)
 const renderGraph = () => {
   if (!graphSvg.value || !graphData.value) {
-    console.log('Cannot render: svg or data missing')
     return
   }
-  
+
   const container = graphContainer.value
   if (!container) {
-    console.log('Cannot render: container missing')
     return
   }
-  
+
   // 获取容器尺寸
   const rect = container.getBoundingClientRect()
   const width = rect.width || 800
   const height = (rect.height || 600) - 60
-  
+
   if (width <= 0 || height <= 0) {
-    console.log('Cannot render: invalid dimensions', width, height)
     return
   }
-  
-  console.log('Rendering graph:', width, 'x', height)
   
   const svg = d3.select(graphSvg.value)
     .attr('width', width)
@@ -900,7 +887,6 @@ const renderGraph = () => {
   const edgesData = graphData.value.edges || []
   
   if (nodesData.length === 0) {
-    console.log('No nodes to render')
     // 显示空状态
     svg.append('text')
       .attr('x', width / 2)
@@ -939,8 +925,6 @@ const renderGraph = () => {
         target_name: nodeMap[e.target_node_uuid]?.name || '未知'
       }
     }))
-  
-  console.log('Nodes:', nodes.length, 'Edges:', edges.length)
   
   // 颜色映射
   const types = [...new Set(nodes.map(n => n.type))]

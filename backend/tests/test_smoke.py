@@ -2,19 +2,24 @@
 Smoke tests for core API endpoints.
 
 Validates response status codes and key fields WITHOUT calling external services
-(Zep, Stripe, LLM). All tests run against an in-memory SQLite database.
+(Zep, Stripe, LLM). All tests run against a temp SQLite file that is created
+fresh for each test session and deleted on teardown.
 
 Run from backend/ directory:
     pytest tests/test_smoke.py -v
 """
 
 import os
+import tempfile
 import pytest
 
-# Use in-memory SQLite so tests never touch production data
-os.environ.setdefault("DATABASE_URL", "")
-os.environ.setdefault("SECRET_KEY", "test-secret-key-for-smoke-tests")
-os.environ.setdefault("FLASK_DEBUG", "False")
+# Must be set BEFORE the app is imported so the config module picks them up.
+_db_fd, _db_path = tempfile.mkstemp(suffix=".db", prefix="futuresreport_smoke_")
+os.close(_db_fd)
+
+os.environ["DATABASE_URL"] = f"sqlite:///{_db_path}"
+os.environ["SECRET_KEY"] = "test-secret-key-for-smoke-tests"
+os.environ["FLASK_DEBUG"] = "False"
 
 
 @pytest.fixture(scope="module")
@@ -24,7 +29,12 @@ def app():
     from app import create_app
     application = create_app()
     application.config["TESTING"] = True
-    return application
+    yield application
+    # Teardown: delete temp db file
+    try:
+        os.unlink(_db_path)
+    except OSError:
+        pass
 
 
 @pytest.fixture(scope="module")
