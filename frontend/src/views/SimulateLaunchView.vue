@@ -125,6 +125,9 @@
             </button>
           </div>
         </div>
+
+        <!-- 推演記錄 -->
+        <HistoryDatabase />
       </template>
     </div>
   </div>
@@ -134,6 +137,7 @@
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { authState, saveLlmConfig } from '../store/auth'
+import HistoryDatabase from '../components/HistoryDatabase.vue'
 
 const router = useRouter()
 

@@ -354,7 +354,11 @@
     "notStarted": "未開始",
     "roundsProgress": "{current}/{total} 輪",
     "untitledSimulation": "未命名模擬",
-    "unknownFile": "未知檔案"
+    "unknownFile": "未知檔案",
+    "statusCompleted": "已完成",
+    "statusRunning": "推演中",
+    "statusFailed": "已中止",
+    "retentionNotice": "推演記錄保留 30 天"
   },
   "api": {
     "projectNotFound": "專案不存在: {id}",
