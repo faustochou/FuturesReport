@@ -354,7 +354,11 @@
     "notStarted": "Not started",
     "roundsProgress": "{current}/{total} rounds",
     "untitledSimulation": "Untitled simulation",
-    "unknownFile": "Unknown file"
+    "unknownFile": "Unknown file",
+    "statusCompleted": "Completed",
+    "statusRunning": "Running",
+    "statusFailed": "Aborted",
+    "retentionNotice": "Records retained for 30 days"
   },
   "api": {
     "projectNotFound": "Project not found: {id}",

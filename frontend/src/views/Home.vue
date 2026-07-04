@@ -209,9 +209,6 @@
         </div>
       </section>
 
-      <!-- 历史项目数据库 -->
-      <HistoryDatabase />
-
       <footer class="site-footer">
         <small>© 2026 Nexora. All rights reserved. 未境 版权所有。 Based on MiroFish, licensed under AGPLv3</small>
       </footer>
@@ -222,7 +219,6 @@
 <script setup>
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
-import HistoryDatabase from '../components/HistoryDatabase.vue'
 import { authState } from '../store/auth'
 
 const router = useRouter()

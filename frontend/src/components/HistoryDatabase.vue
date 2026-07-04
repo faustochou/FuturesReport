@@ -17,6 +17,9 @@
       <div class="section-line"></div>
     </div>
 
+    <!-- 30 天保留期提示 -->
+    <div class="retention-notice">{{ $t('history.retentionNotice') }}</div>
+
     <!-- 卡片容器（只在有项目时显示） -->
     <div v-if="projects.length > 0" class="cards-container" :class="{ expanded: isExpanded }" :style="containerStyle">
       <div 
@@ -194,7 +197,7 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getSimulationHistory } from '../api/simulation'
+import { getSimulationRecords } from '../api/simulation'
 
 const router = useRouter()
 const route = useRoute()
@@ -290,21 +293,12 @@ const getCardStyle = (index) => {
   }
 }
 
-// 根据轮数进度获取样式类
+// 根据 status 字段获取样式类
 const getProgressClass = (simulation) => {
-  const current = simulation.current_round || 0
-  const total = simulation.total_rounds || 0
-  
-  if (total === 0 || current === 0) {
-    // 未开始
-    return 'not-started'
-  } else if (current >= total) {
-    // 已完成
-    return 'completed'
-  } else {
-    // 进行中
-    return 'in-progress'
-  }
+  const status = simulation.status || 'running'
+  if (status === 'completed') return 'completed'
+  if (status === 'failed') return 'failed'
+  return 'in-progress'
 }
 
 // 格式化日期（只显示日期部分）
@@ -351,12 +345,12 @@ const formatSimulationId = (simulationId) => {
   return `SIM_${prefix.toUpperCase()}`
 }
 
-// 格式化轮数显示（当前轮/总轮数）
+// 格式化状态显示
 const formatRounds = (simulation) => {
-  const current = simulation.current_round || 0
-  const total = simulation.total_rounds || 0
-  if (total === 0) return t('history.notStarted')
-  return t('history.roundsProgress', { current, total })
+  const status = simulation.status || 'running'
+  if (status === 'completed') return t('history.statusCompleted')
+  if (status === 'failed') return t('history.statusFailed')
+  return t('history.statusRunning')
 }
 
 // 获取文件类型（用于样式）
@@ -440,12 +434,17 @@ const goToReport = () => {
 const loadHistory = async () => {
   try {
     loading.value = true
-    const response = await getSimulationHistory(20)
+    const response = await getSimulationRecords(20)
     if (response.success) {
-      projects.value = response.data || []
+      projects.value = (response.data || []).map(rec => ({
+        ...rec,
+        files: (rec.report_filenames || []).map(f => ({ filename: f })),
+        simulation_requirement: rec.title,
+        created_at: rec.started_at || rec.created_at,
+      }))
     }
   } catch (error) {
-    console.error('加载历史项目失败:', error)
+    console.error('加载推演记录失败:', error)
     projects.value = []
   } finally {
     loading.value = false
@@ -533,9 +532,9 @@ const initObserver = () => {
   }
 }
 
-// 监听路由变化，当返回首页时重新加载数据
+// 监听路由变化，当返回推演页时重新加载数据
 watch(() => route.path, (newPath) => {
-  if (newPath === '/') {
+  if (newPath === '/launch') {
     loadHistory()
   }
 })
@@ -750,7 +749,18 @@ onUnmounted(() => {
 .card-progress.completed { color: #10B981; }    /* 已完成 - 绿色 */
 .card-progress.in-progress { color: #F59E0B; }  /* 进行中 - 橙色 */
 .card-progress.not-started { color: #9CA3AF; }  /* 未开始 - 灰色 */
+.card-progress.failed { color: #EF4444; }        /* 失敗 - 紅色 */
 .card-status.pending { color: #9CA3AF; }
+
+/* 30 天保留期提示 */
+.retention-notice {
+  text-align: center;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.65rem;
+  color: #9CA3AF;
+  letter-spacing: 0.5px;
+  margin-bottom: 8px;
+}
 
 /* 文件列表区域 */
 .card-files-wrapper {
@@ -952,6 +962,7 @@ onUnmounted(() => {
 .card-footer .card-progress.completed { color: #10B981; }
 .card-footer .card-progress.in-progress { color: #F59E0B; }
 .card-footer .card-progress.not-started { color: #9CA3AF; }
+.card-footer .card-progress.failed { color: #EF4444; }
 
 /* 底部装饰线 */
 .card-bottom-line {
@@ -1107,6 +1118,7 @@ onUnmounted(() => {
 .modal-progress.completed { color: #10B981; background: rgba(16, 185, 129, 0.1); }
 .modal-progress.in-progress { color: #F59E0B; background: rgba(245, 158, 11, 0.1); }
 .modal-progress.not-started { color: #9CA3AF; background: #F3F4F6; }
+.modal-progress.failed { color: #EF4444; background: rgba(239, 68, 68, 0.1); }
 
 .modal-create-time {
   font-family: 'JetBrains Mono', monospace;

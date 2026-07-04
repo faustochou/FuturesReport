@@ -198,3 +198,13 @@ export const getSimulationHistory = (limit = 20) => {
   return service.get('/api/simulation/history', { params: { limit } })
 }
 
+/**
+ * 取得持久化推演記錄（新版 DB-backed）
+ * 需登入，Authorization header 由 axios interceptor 自動附加
+ * @param {number} limit
+ * @param {number} offset
+ */
+export const getSimulationRecords = (limit = 20, offset = 0) => {
+  return service.get('/api/simulation/records', { params: { limit, offset } })
+}
+
