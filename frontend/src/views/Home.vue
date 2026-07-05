@@ -1,12 +1,7 @@
 <template>
   <div class="home-container">
-    <!-- 顶部导航栏 -->
-    <nav class="navbar">
-      <div class="nav-brand">
-        <AppLogo variant="brand" />
-      </div>
-      <div class="nav-links"></div>
-    </nav>
+    <!-- 頂部 Header（含語言切換 + 帳號） -->
+    <AppHeader />
 
     <div class="main-content">
       <!-- 上半部分：Hero 区域 -->
@@ -220,6 +215,7 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { authState } from '../store/auth'
+import AppHeader from '../components/AppHeader.vue'
 
 const router = useRouter()
 
@@ -257,30 +253,6 @@ const goToLaunch = () => {
   background: var(--white);
   font-family: var(--font-sans);
   color: var(--black);
-}
-
-/* 顶部导航 */
-.navbar {
-  height: 60px;
-  background: var(--black);
-  color: var(--white);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 40px;
-}
-
-.nav-brand {
-  font-family: var(--font-mono);
-  font-weight: 800;
-  letter-spacing: 1px;
-  font-size: 1.2rem;
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 16px;
 }
 
 /* 主要内容区 */
@@ -856,9 +828,6 @@ html[lang="en"] .tag-row {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
 }
 
-html[lang="en"] .navbar .nav-links {
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-}
 
 /* Left pane: system status + workflow */
 html[lang="en"] .status-section {

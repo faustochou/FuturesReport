@@ -1,5 +1,6 @@
 <template>
-  <div class="global-tools">
+  <!-- 首頁由 AppHeader 自帶語言/帳號功能；其他頁面保留浮動工具列 -->
+  <div v-if="route.path !== '/'" class="global-tools">
     <LanguageSwitcher />
     <AuthPanel />
   </div>
@@ -7,10 +8,11 @@
 </template>
 
 <script setup>
+import { useRoute } from 'vue-router'
 import AuthPanel from './components/AuthPanel.vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
 
-// 使用 Vue Router 来管理页面
+const route = useRoute()
 </script>
 
 <style>
