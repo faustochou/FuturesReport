@@ -226,3 +226,18 @@ class SimulationRecord(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
 
     user: Mapped["User"] = relationship("User", back_populates="simulation_records")
+
+
+# ---------------------------------------------------------------------------
+# SiteSettings  (admin-editable key-value store for global site config)
+# ---------------------------------------------------------------------------
+
+class SiteSettings(Base):
+    """Simple key-value store for site-wide settings managed by admin."""
+    __tablename__ = "site_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )

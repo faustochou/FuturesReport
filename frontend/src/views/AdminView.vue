@@ -449,6 +449,33 @@ STRIPE_PRICE_ID_LITE=price_...</pre>
           </div>
         </div>
       </section>
+
+      <!-- ── Social Links ── -->
+      <section v-if="activeTab === 'social'" class="settings-panel">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">{{ $t('admin.tabSocial') }}</p>
+            <h2>{{ $t('admin.socialTitle') }}</h2>
+          </div>
+          <button class="icon-btn" type="button" @click="loadSocialLinks">↻</button>
+        </div>
+        <p class="hint">{{ $t('admin.socialDesc') }}</p>
+        <div class="settings-grid" style="max-width: 640px;">
+          <label v-for="key in SOCIAL_KEYS" :key="key" class="setting-card">
+            <p class="setting-label">{{ $t(`admin.${socialLabelKey(key)}`) }}</p>
+            <input v-model.trim="socialForm[key]" placeholder="https://..." class="setting-input" />
+          </label>
+        </div>
+        <button
+          class="primary-btn"
+          style="margin-top: 20px;"
+          type="button"
+          :disabled="socialLoading"
+          @click="saveSocialLinks"
+        >{{ socialLoading ? $t('admin.socialSaving') : $t('admin.socialSave') }}</button>
+        <p v-if="socialMessage" class="success-text" style="margin-top: 12px;">{{ socialMessage }}</p>
+        <p v-if="socialError" class="error-text" style="margin-top: 12px;">{{ socialError }}</p>
+      </section>
     </template>
   </main>
 </template>
@@ -464,6 +491,7 @@ import {
   getAdminAccessToken,
   getAdminMe,
   getAdminUsers,
+  getAdminSocialLinks,
   getDashboard,
   getStripeSettings,
   getVersionHistory,
@@ -471,6 +499,7 @@ import {
   setAdminToken,
   setUserSubscription,
   toggleUserActive,
+  updateAdminSocialLinks,
   updateAdminTier,
   updateAdminUser,
 } from '../api/admin'
@@ -487,6 +516,7 @@ const tabs = [
   { id: 'stripe',    labelKey: 'tabStripe' },
   { id: 'tiers',     labelKey: 'tabTiers' },
   { id: 'versions',  labelKey: 'tabVersions' },
+  { id: 'social',    labelKey: 'tabSocial' },
 ]
 
 // Dashboard
@@ -541,6 +571,14 @@ const subMessage = ref('')
 const subError   = ref('')
 const subForm    = reactive({ tierCode: '' })
 
+// Social links
+const SOCIAL_KEYS = ['social_facebook', 'social_x', 'social_instagram', 'social_threads', 'social_github']
+const socialLabelKey = (key) => key.replace(/_([a-z])/g, (_, c) => c.toUpperCase())
+const socialForm    = reactive({ social_facebook: '', social_x: '', social_instagram: '', social_threads: '', social_github: '' })
+const socialLoading = ref(false)
+const socialMessage = ref('')
+const socialError   = ref('')
+
 // Auto-load tab data when switching
 watch(activeTab, (tab) => {
   if (tab === 'dashboard') loadDashboard()
@@ -548,6 +586,7 @@ watch(activeTab, (tab) => {
   if (tab === 'stripe')    loadStripeSettings()
   if (tab === 'tiers')     loadTiers()
   if (tab === 'versions')  loadVersions()
+  if (tab === 'social')    loadSocialLinks()
 })
 
 // ── Login ────────────────────────────────────────────────────────────────────
@@ -629,6 +668,40 @@ const loadVersions = async () => {
     versions.value = res.data?.versions || []
   } catch (err) {
     error.value = err.message || t('admin.loadVersionsFailed')
+  }
+}
+
+const loadSocialLinks = async () => {
+  try {
+    const res = await getAdminSocialLinks()
+    const data = res.data || {}
+    SOCIAL_KEYS.forEach(k => { socialForm[k] = data[k] || '' })
+  } catch (err) {
+    socialError.value = err.message || t('admin.loadSocialFailed')
+  }
+}
+
+const saveSocialLinks = async () => {
+  const urlRe = /^(https?:\/\/).+/
+  for (const k of SOCIAL_KEYS) {
+    const v = socialForm[k]
+    if (v && !urlRe.test(v)) {
+      socialError.value = t('admin.socialInvalidUrl')
+      return
+    }
+  }
+  socialLoading.value = true
+  socialMessage.value = ''
+  socialError.value   = ''
+  try {
+    const payload = {}
+    SOCIAL_KEYS.forEach(k => { payload[k] = socialForm[k] })
+    await updateAdminSocialLinks(payload)
+    socialMessage.value = t('admin.socialSaved')
+  } catch (err) {
+    socialError.value = err.message || t('admin.socialSaveFailed')
+  } finally {
+    socialLoading.value = false
   }
 }
 

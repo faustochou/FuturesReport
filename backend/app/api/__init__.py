@@ -10,6 +10,7 @@ report_bp = Blueprint('report', __name__)
 auth_bp = Blueprint('auth', __name__)
 admin_bp = Blueprint('admin', __name__)
 subscription_bp = Blueprint('subscription', __name__)
+settings_bp = Blueprint('settings', __name__)
 
 from . import graph  # noqa: E402, F401
 from . import simulation  # noqa: E402, F401
@@ -17,4 +18,5 @@ from . import report  # noqa: E402, F401
 from . import auth  # noqa: E402, F401
 from . import admin  # noqa: E402, F401
 from . import subscription  # noqa: E402, F401
+from . import settings  # noqa: E402, F401
 

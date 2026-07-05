@@ -249,6 +249,64 @@ def list_tiers():
     })
 
 
+# ---------------------------------------------------------------------------
+# Site settings – social links
+# ---------------------------------------------------------------------------
+
+_SOCIAL_KEYS = frozenset([
+    "social_facebook", "social_x", "social_instagram",
+    "social_threads", "social_github",
+])
+
+
+@admin_bp.route("/settings/social", methods=["GET"])
+@require_admin
+def get_social_settings():
+    """Return current social link settings (admin view)."""
+    from sqlalchemy import select as sa_select
+    from ..db.database import get_db
+    from ..db.models import SiteSettings
+    with get_db() as db:
+        rows = db.execute(
+            sa_select(SiteSettings).where(SiteSettings.key.in_(_SOCIAL_KEYS))
+        ).scalars().all()
+    data = {r.key: r.value or "" for r in rows}
+    for k in _SOCIAL_KEYS:
+        data.setdefault(k, "")
+    return jsonify({"success": True, "data": data})
+
+
+@admin_bp.route("/settings/social", methods=["PUT"])
+@require_admin
+def update_social_settings():
+    """Update social link URLs. Pass only the fields you want to change."""
+    from datetime import datetime
+    from sqlalchemy import select as sa_select
+    from ..db.database import get_db
+    from ..db.models import SiteSettings
+    body = request.get_json() or {}
+    updates = {k: str(v or "").strip() for k, v in body.items() if k in _SOCIAL_KEYS}
+    if not updates:
+        return jsonify({"success": False, "error": "No valid fields provided"}), 400
+
+    now = datetime.utcnow()
+    with get_db() as db:
+        existing = {
+            r.key: r
+            for r in db.execute(
+                sa_select(SiteSettings).where(SiteSettings.key.in_(updates.keys()))
+            ).scalars().all()
+        }
+        for key, value in updates.items():
+            if key in existing:
+                existing[key].value = value
+                existing[key].updated_at = now
+            else:
+                db.add(SiteSettings(key=key, value=value, updated_at=now))
+
+    return jsonify({"success": True, "data": updates})
+
+
 @admin_bp.route("/subscription/tiers/<tier_code>", methods=["PUT"])
 @require_admin
 def update_tier(tier_code: str):
