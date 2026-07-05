@@ -2,10 +2,9 @@
   <header class="app-header">
     <div class="header-inner">
 
-      <!-- 左側：Logo + 品牌名稱，點擊返回首頁 -->
+      <!-- 左側：Logo，點擊返回首頁 -->
       <a class="header-brand" @click.prevent="router.push('/')">
         <AppLogo variant="brand" />
-        <span class="brand-name">未來報告</span>
       </a>
 
       <!-- 右側功能區（桌機：始終可見） -->
@@ -91,18 +90,6 @@ const mobileOpen = ref(false)
   flex-shrink: 0;
 }
 
-.brand-name {
-  font-family: 'JetBrains Mono', 'SF Mono', monospace;
-  font-size: 13px;
-  font-weight: 800;
-  color: #111;
-  letter-spacing: 0.5px;
-  transition: color 0.2s;
-}
-
-.header-brand:hover .brand-name {
-  color: #555;
-}
 
 /* ── 右側功能區（桌機） ── */
 .header-right {
