@@ -270,7 +270,7 @@ def get_social_settings():
         rows = db.execute(
             sa_select(SiteSettings).where(SiteSettings.key.in_(_SOCIAL_KEYS))
         ).scalars().all()
-    data = {r.key: r.value or "" for r in rows}
+        data = {r.key: r.value or "" for r in rows}
     for k in _SOCIAL_KEYS:
         data.setdefault(k, "")
     return jsonify({"success": True, "data": data})

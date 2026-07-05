@@ -51,63 +51,97 @@
       <section class="dashboard-section">
         <!-- Row 1: 系统状态 -->
         <div class="status-row">
-          <div class="panel-header">
-            <span class="status-dot">■</span> {{ $t('home.systemStatus') }}
-          </div>
-          <h2 class="section-title">{{ $t('home.systemReady') }}</h2>
-          <p class="section-desc">{{ $t('home.systemReadyDesc') }}</p>
-          <div class="metrics-row">
-            <div class="metric-card">
-              <div class="metric-value">{{ $t('home.metricLowCost') }}</div>
-              <div class="metric-label">{{ $t('home.metricLowCostDesc') }}</div>
+          <div class="status-main">
+            <div class="status-indicator">
+              <span class="status-live-dot"></span>
+              <span class="status-tag">{{ $t('home.systemStatus') }}</span>
             </div>
-            <div class="metric-card">
-              <div class="metric-value">{{ $t('home.metricHighAvail') }}</div>
-              <div class="metric-label">{{ $t('home.metricHighAvailDesc') }}</div>
+            <h2 class="status-title">{{ $t('home.systemReady') }}</h2>
+            <p class="status-desc">{{ $t('home.systemReadyDesc') }}</p>
+          </div>
+          <div class="status-metrics">
+            <div class="metric-block">
+              <div class="metric-big">{{ $t('home.metricLowCost') }}</div>
+              <div class="metric-sub">{{ $t('home.metricLowCostDesc') }}</div>
+            </div>
+            <div class="metric-sep"></div>
+            <div class="metric-block">
+              <div class="metric-big">{{ $t('home.metricHighAvail') }}</div>
+              <div class="metric-sub">{{ $t('home.metricHighAvailDesc') }}</div>
             </div>
           </div>
         </div>
 
-        <!-- Row 2: 工作流序列 -->
-        <div class="steps-container">
-          <div class="steps-header">
-             <span class="diamond-icon">◇</span> {{ $t('home.workflowSequence') }}
+        <!-- Row 2: 工作流序列 — 横向 -->
+        <div class="workflow-flow">
+          <div class="flow-header">
+            <span class="diamond-icon">◇</span>
+            <span>{{ $t('home.workflowSequence') }}</span>
           </div>
-          <div class="workflow-list">
-            <div class="workflow-item">
-              <span class="step-num">01</span>
-              <div class="step-info">
-                <div class="step-title">{{ $t('home.step01Title') }}</div>
-                <div class="step-desc">{{ $t('home.step01Desc') }}</div>
+          <div class="flow-steps">
+            <!-- 01 -->
+            <div class="flow-step">
+              <div class="flow-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <circle cx="5" cy="12" r="2.2"/><circle cx="19" cy="5" r="2.2"/><circle cx="19" cy="19" r="2.2"/>
+                  <path d="M7.1 10.9 16.9 6.1M7.1 13.1 16.9 17.9"/>
+                  <circle cx="12" cy="12" r="1.2" fill="currentColor" stroke="none"/>
+                </svg>
               </div>
+              <div class="flow-num">01</div>
+              <div class="flow-title">{{ $t('home.step01Title') }}</div>
+              <div class="flow-desc">{{ $t('home.step01Desc') }}</div>
             </div>
-            <div class="workflow-item">
-              <span class="step-num">02</span>
-              <div class="step-info">
-                <div class="step-title">{{ $t('home.step02Title') }}</div>
-                <div class="step-desc">{{ $t('home.step02Desc') }}</div>
+            <!-- 02 -->
+            <div class="flow-step">
+              <div class="flow-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="3" y="14" width="18" height="4" rx="1"/><rect x="3" y="9" width="18" height="4" rx="1"/><rect x="3" y="4" width="18" height="4" rx="1"/>
+                  <circle cx="7" cy="16" r="1" fill="currentColor" stroke="none"/>
+                  <circle cx="7" cy="11" r="1" fill="currentColor" stroke="none"/>
+                </svg>
               </div>
+              <div class="flow-num">02</div>
+              <div class="flow-title">{{ $t('home.step02Title') }}</div>
+              <div class="flow-desc">{{ $t('home.step02Desc') }}</div>
             </div>
-            <div class="workflow-item">
-              <span class="step-num">03</span>
-              <div class="step-info">
-                <div class="step-title">{{ $t('home.step03Title') }}</div>
-                <div class="step-desc">{{ $t('home.step03Desc') }}</div>
+            <!-- 03 -->
+            <div class="flow-step">
+              <div class="flow-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <rect x="2" y="4" width="20" height="16" rx="2"/>
+                  <path d="M10 9l5 3-5 3V9z" fill="currentColor" stroke="none"/>
+                  <line x1="8" y1="4" x2="8" y2="2"/><line x1="16" y1="4" x2="16" y2="2"/>
+                </svg>
               </div>
+              <div class="flow-num">03</div>
+              <div class="flow-title">{{ $t('home.step03Title') }}</div>
+              <div class="flow-desc">{{ $t('home.step03Desc') }}</div>
             </div>
-            <div class="workflow-item">
-              <span class="step-num">04</span>
-              <div class="step-info">
-                <div class="step-title">{{ $t('home.step04Title') }}</div>
-                <div class="step-desc">{{ $t('home.step04Desc') }}</div>
+            <!-- 04 -->
+            <div class="flow-step">
+              <div class="flow-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M3 20h18M5 20V14M9 20V9M13 20V12M17 20V5"/>
+                  <polyline points="17 5 17 5" stroke-width="2.5"/>
+                  <path d="M5 14 9 9 13 12 17 5" stroke-width="1.4"/>
+                </svg>
               </div>
+              <div class="flow-num">04</div>
+              <div class="flow-title">{{ $t('home.step04Title') }}</div>
+              <div class="flow-desc">{{ $t('home.step04Desc') }}</div>
             </div>
-            <div class="workflow-item">
-              <span class="step-num">05</span>
-              <div class="step-info">
-                <div class="step-title">{{ $t('home.step05Title') }}</div>
-                <div class="step-desc">{{ $t('home.step05Desc') }}</div>
+            <!-- 05 -->
+            <div class="flow-step">
+              <div class="flow-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                  <line x1="9" y1="10" x2="15" y2="10"/><line x1="9" y1="13" x2="13" y2="13"/>
+                </svg>
               </div>
+              <div class="flow-num">05</div>
+              <div class="flow-title">{{ $t('home.step05Title') }}</div>
+              <div class="flow-desc">{{ $t('home.step05Desc') }}</div>
             </div>
           </div>
         </div>
@@ -126,62 +160,54 @@
 
             <div class="method-rule"></div>
 
-            <!-- Report types: icon list -->
-            <div class="report-list">
-              <div class="report-item">
-                <div class="report-icon">
+            <!-- Report types: 4-column grid -->
+            <div class="report-grid">
+              <div class="report-col">
+                <div class="report-col-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/>
                     <rect x="9" y="3" width="6" height="4" rx="1.5"/>
                     <polyline points="7 13 10 16 17 11"/>
                   </svg>
                 </div>
-                <div class="report-text">
-                  <span class="report-name">{{ $t('home.reportCorporate') }}</span>
-                  <span class="report-sub">Annual &amp; Financial Reports</span>
-                </div>
-                <span class="report-num">01</span>
+                <span class="report-col-num">01</span>
+                <span class="report-col-name">{{ $t('home.reportCorporate') }}</span>
+                <span class="report-col-desc">財務健康評估・資本配置決策・股東價值推演</span>
               </div>
-              <div class="report-item">
-                <div class="report-icon">
+              <div class="report-col">
+                <div class="report-col-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M3 21h18M3 10h18M12 3 3 10h18L12 3z"/>
                     <path d="M9 21v-5h6v5"/>
                   </svg>
                 </div>
-                <div class="report-text">
-                  <span class="report-name">{{ $t('home.reportGovernment') }}</span>
-                  <span class="report-sub">Government &amp; Policy Reports</span>
-                </div>
-                <span class="report-num">02</span>
+                <span class="report-col-num">02</span>
+                <span class="report-col-name">{{ $t('home.reportGovernment') }}</span>
+                <span class="report-col-desc">政策效應評估・監管趨勢分析・公共輿論情景推演</span>
               </div>
-              <div class="report-item">
-                <div class="report-icon">
+              <div class="report-col">
+                <div class="report-col-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 14 3 9l9-5 9 5-9 5z"/>
                     <path d="M3 9v6l9 5 9-5V9"/>
                     <line x1="12" y1="14" x2="12" y2="19"/>
                   </svg>
                 </div>
-                <div class="report-text">
-                  <span class="report-name">{{ $t('home.reportAcademic') }}</span>
-                  <span class="report-sub">Academic Research Papers</span>
-                </div>
-                <span class="report-num">03</span>
+                <span class="report-col-num">03</span>
+                <span class="report-col-name">{{ $t('home.reportAcademic') }}</span>
+                <span class="report-col-desc">前沿技術趨勢・跨學科洞察・科研成果情景分析</span>
               </div>
-              <div class="report-item">
-                <div class="report-icon">
+              <div class="report-col">
+                <div class="report-col-icon">
                   <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
                     <circle cx="12" cy="12" r="9"/>
                     <path d="M3.6 9h16.8M3.6 15h16.8"/>
                     <path d="M12 3c-2.4 3-3.6 5.8-3.6 9s1.2 6 3.6 9M12 3c2.4 3 3.6 5.8 3.6 9s-1.2 6-3.6 9"/>
                   </svg>
                 </div>
-                <div class="report-text">
-                  <span class="report-name">{{ $t('home.reportInternational') }}</span>
-                  <span class="report-sub">International Organizations</span>
-                </div>
-                <span class="report-num">04</span>
+                <span class="report-col-num">04</span>
+                <span class="report-col-name">{{ $t('home.reportInternational') }}</span>
+                <span class="report-col-desc">地緣政治風險・全球宏觀趨勢・多邊合作情景推演</span>
               </div>
             </div>
 
@@ -301,7 +327,7 @@ onMounted(async () => {
 .hero-section {
   display: flex;
   justify-content: space-between;
-  margin-bottom: 80px;
+  margin-bottom: 40px;
   position: relative;
 }
 
@@ -454,121 +480,206 @@ onMounted(async () => {
 .dashboard-section {
   display: flex;
   flex-direction: column;
-  gap: 60px;
+  gap: 0;
   border-top: 1px solid var(--border);
-  padding-top: 60px;
+  padding-top: 30px;
 }
 
-/* Row 1: 状态行 */
+/* ── Row 1: Status ── */
 .status-row {
-  display: block;
-}
-
-.panel-header {
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: #999;
   display: flex;
   align-items: center;
-  gap: 8px;
-  margin-bottom: 20px;
+  justify-content: space-between;
+  gap: 60px;
+  border: 1px solid var(--border);
+  border-bottom: none;
+  padding: 36px 36px;
 }
 
-.status-dot {
-  color: var(--orange);
-  font-size: 0.8rem;
+.status-main {
+  flex: 1;
+  min-width: 0;
 }
 
-.section-title {
-  font-size: 2rem;
-  font-weight: 520;
-  margin: 0 0 15px 0;
+.status-indicator {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 18px;
 }
 
-.section-desc {
+.status-live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #16e77f;
+  box-shadow: 0 0 10px rgba(22, 231, 127, 0.8);
+  animation: pulse-green 2.2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes pulse-green {
+  0%, 100% { opacity: 1; box-shadow: 0 0 10px rgba(22,231,127,0.8); }
+  50% { opacity: 0.55; box-shadow: 0 0 4px rgba(22,231,127,0.3); }
+}
+
+.status-tag {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 700;
+  color: #aaa;
+  letter-spacing: 2.5px;
+  text-transform: uppercase;
+}
+
+.status-title {
+  font-size: 2.6rem;
+  font-weight: 500;
+  margin: 0 0 14px;
+  letter-spacing: -1px;
+  color: var(--black);
+}
+
+.status-desc {
   color: var(--gray-text);
-  margin-bottom: 25px;
-  line-height: 1.6;
+  line-height: 1.75;
+  font-size: 0.95rem;
+  max-width: 540px;
 }
 
-.metrics-row {
+.status-metrics {
   display: flex;
-  gap: 20px;
-  margin-bottom: 15px;
+  align-items: center;
+  gap: 44px;
+  flex-shrink: 0;
 }
 
-.metric-card {
-  border: 1px solid var(--border);
-  padding: 20px 30px;
-  min-width: 150px;
+.metric-block {
+  text-align: center;
 }
 
-.metric-value {
+.metric-big {
   font-family: var(--font-mono);
-  font-size: 1.8rem;
-  font-weight: 520;
-  margin-bottom: 5px;
+  font-size: 2.1rem;
+  font-weight: 700;
+  color: var(--black);
+  margin-bottom: 6px;
+  letter-spacing: -1px;
 }
 
-.metric-label {
-  font-size: 0.85rem;
+.metric-sub {
+  font-size: 0.78rem;
   color: #999;
-}
-
-/* 项目模拟步骤介绍 */
-.steps-container {
-  border: 1px solid var(--border);
-  padding: 30px;
-  position: relative;
-}
-
-.steps-header {
   font-family: var(--font-mono);
-  font-size: 0.8rem;
-  color: #999;
-  margin-bottom: 25px;
+  letter-spacing: 0.2px;
+}
+
+.metric-sep {
+  width: 1px;
+  height: 56px;
+  background: var(--border);
+}
+
+/* ── Row 2: Workflow horizontal ── */
+.workflow-flow {
+  border: 1px solid var(--border);
+  overflow: hidden;
+  margin-bottom: 56px;
+}
+
+.flow-header {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+  color: #aaa;
   display: flex;
   align-items: center;
   gap: 8px;
+  padding: 18px 36px;
+  border-bottom: 1px solid var(--border);
+  letter-spacing: 0.5px;
 }
 
 .diamond-icon {
-  font-size: 1.2rem;
+  font-size: 1rem;
   line-height: 1;
+  color: var(--orange);
 }
 
-.workflow-list {
+.flow-steps {
+  display: flex;
+}
+
+.flow-step {
+  flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  align-items: center;
+  text-align: center;
+  padding: 40px 20px 36px;
+  border-right: 1px solid var(--border);
+  transition: background 0.2s;
+  cursor: default;
+  position: relative;
 }
 
-.workflow-item {
-  display: flex;
-  align-items: flex-start;
-  gap: 20px;
+.flow-step:last-child {
+  border-right: none;
 }
 
-.step-num {
+.flow-step::before {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 2px;
+  background: var(--orange);
+  transform: scaleX(0);
+  transition: transform 0.3s ease;
+}
+
+.flow-step:hover::before {
+  transform: scaleX(1);
+}
+
+.flow-step:hover {
+  background: rgba(255, 69, 0, 0.02);
+}
+
+.flow-icon {
+  width: 46px;
+  height: 46px;
+  color: var(--orange);
+  margin-bottom: 18px;
+  opacity: 0.75;
+  transition: opacity 0.2s, transform 0.25s;
+}
+
+.flow-step:hover .flow-icon {
+  opacity: 1;
+  transform: translateY(-3px);
+}
+
+.flow-num {
   font-family: var(--font-mono);
+  font-size: 0.62rem;
   font-weight: 700;
+  color: #ccc;
+  letter-spacing: 3px;
+  margin-bottom: 12px;
+}
+
+.flow-title {
+  font-size: 0.95rem;
+  font-weight: 600;
   color: var(--black);
-  opacity: 0.3;
+  margin-bottom: 10px;
 }
 
-.step-info {
-  flex: 1;
-}
-
-.step-title {
-  font-weight: 520;
-  font-size: 1rem;
-  margin-bottom: 4px;
-}
-
-.step-desc {
-  font-size: 0.85rem;
+.flow-desc {
+  font-size: 0.74rem;
   color: var(--gray-text);
+  line-height: 1.65;
 }
 
 /* Hero CTA 按钮 */
@@ -635,7 +746,9 @@ onMounted(async () => {
 
 /* Row 3: 未来前瞻分析引擎 — 全黑暗主題 */
 .method-box {
+  display: block;
   width: 100%;
+  box-sizing: border-box;
   background: #0A0A0A;
   border: 1px solid #1C1C1C;
   overflow: hidden;
@@ -699,75 +812,78 @@ onMounted(async () => {
   margin: 0 36px;
 }
 
-/* ── Report list ── */
-.report-list {
-  padding: 6px 36px;
+/* ── Report grid (4 columns) ── */
+.report-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  margin: 0 36px;
 }
 
-.report-item {
+.report-col {
   display: flex;
-  align-items: center;
-  gap: 18px;
-  padding: 17px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  flex-direction: column;
+  align-items: flex-start;
+  padding: 30px 28px;
+  border-right: 1px solid rgba(255, 255, 255, 0.06);
   transition: background 0.2s;
   cursor: default;
+  gap: 0;
 }
 
-.report-item:last-child {
-  border-bottom: none;
+.report-col:last-child {
+  border-right: none;
 }
 
-.report-item:hover .report-icon {
-  color: #16e77f;
+.report-col:hover {
+  background: rgba(255, 255, 255, 0.025);
 }
 
-.report-item:hover .report-name {
-  color: #FFFFFF;
-}
-
-.report-icon {
-  width: 22px;
-  height: 22px;
-  flex-shrink: 0;
-  color: rgba(255, 255, 255, 0.3);
+.report-col-icon {
+  width: 28px;
+  height: 28px;
+  color: rgba(255, 255, 255, 0.35);
+  margin-bottom: 20px;
   transition: color 0.25s;
+  flex-shrink: 0;
 }
 
-.report-icon svg {
+.report-col-icon svg {
   width: 100%;
   height: 100%;
 }
 
-.report-text {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+.report-col:hover .report-col-icon {
+  color: #16e77f;
 }
 
-.report-name {
+.report-col-num {
+  font-family: var(--font-mono);
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.15);
+  letter-spacing: 1.5px;
+  margin-bottom: 8px;
+}
+
+.report-col-name {
   font-size: 0.9rem;
   font-weight: 600;
-  color: rgba(255, 255, 255, 0.82);
-  line-height: 1.3;
+  color: rgba(255, 255, 255, 0.84);
+  line-height: 1.4;
+  margin-bottom: 12px;
   transition: color 0.25s;
 }
 
-.report-sub {
-  font-family: var(--font-mono);
-  font-size: 0.62rem;
-  color: rgba(255, 255, 255, 0.22);
-  letter-spacing: 0.5px;
+.report-col:hover .report-col-name {
+  color: #FFFFFF;
 }
 
-.report-num {
+.report-col-desc {
   font-family: var(--font-mono);
-  font-size: 0.62rem;
-  font-weight: 700;
-  color: rgba(255, 255, 255, 0.15);
-  letter-spacing: 1px;
-  flex-shrink: 0;
+  font-size: 0.61rem;
+  color: rgba(255, 255, 255, 0.3);
+  line-height: 1.7;
+  letter-spacing: 0.2px;
 }
 
 /* ── Footer: methodology strip + CTA ── */
@@ -845,11 +961,27 @@ onMounted(async () => {
 }
 
 /* 响应式适配 */
-@media (max-width: 1024px) {
-  .dashboard-section {
-    flex-direction: column;
+@media (max-width: 1200px) {
+  .flow-steps {
+    flex-wrap: wrap;
   }
+  .flow-step {
+    flex: 0 0 33.333%;
+    border-bottom: 1px solid var(--border);
+  }
+  .report-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .report-col:nth-child(2) {
+    border-right: none;
+  }
+  .report-col:nth-child(1),
+  .report-col:nth-child(2) {
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+}
 
+@media (max-width: 1024px) {
   .hero-section {
     flex-direction: column;
   }
@@ -864,18 +996,59 @@ onMounted(async () => {
     margin-bottom: 20px;
   }
 
+  .status-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 28px;
+    padding: 28px 36px;
+  }
+
+  .status-metrics {
+    gap: 32px;
+  }
+
   .site-footer {
     margin-top: 40px;
   }
 }
 
+@media (max-width: 768px) {
+  .flow-step {
+    flex: 0 0 50%;
+  }
+  .status-row {
+    padding: 24px 20px;
+  }
+  .flow-header {
+    padding: 16px 20px;
+  }
+  .status-title {
+    font-size: 2rem;
+  }
+}
+
 @media (max-width: 600px) {
   .method-header,
-  .report-list,
   .method-rule,
   .method-footer {
-    padding-left: 24px;
-    padding-right: 24px;
+    padding-left: 20px;
+    padding-right: 20px;
+  }
+  .report-col {
+    padding: 24px 20px;
+  }
+  .flow-step {
+    flex: 0 0 100%;
+  }
+  .report-grid {
+    grid-template-columns: 1fr;
+  }
+  .report-col {
+    border-right: none;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+  }
+  .report-col:last-child {
+    border-bottom: none;
   }
 }
 </style>

@@ -20,7 +20,7 @@ def get_social_links():
         rows = db.execute(
             select(SiteSettings).where(SiteSettings.key.in_(SOCIAL_KEYS))
         ).scalars().all()
-    data = {r.key: r.value or "" for r in rows}
+        data = {r.key: r.value or "" for r in rows}
     for k in SOCIAL_KEYS:
         data.setdefault(k, "")
     return jsonify({"success": True, "data": data})
