@@ -1,39 +1,33 @@
 <template>
   <main class="sub-page">
-    <!-- Header -->
-    <nav class="sub-nav">
-      <button class="back-btn" type="button" @click="router.push('/')">←</button>
-      <AppLogo variant="brand" />
-    </nav>
-
     <section class="sub-hero">
-      <p class="eyebrow">Subscription Plans</p>
-      <h1>選擇適合你的方案</h1>
-      <p class="sub-desc">FuturesReport 訂閱制讓 AI 多智能體模擬引擎持續為你服務。</p>
+      <p class="eyebrow">{{ $t('subscription.plans') }}</p>
+      <h1>{{ $t('subscription.heroTitle') }}</h1>
+      <p class="sub-desc">{{ $t('subscription.heroDesc') }}</p>
     </section>
 
     <!-- Checkout result banners -->
     <div v-if="checkoutResult === 'success'" class="banner success-banner">
-      ✓ 訂閱成功！你的帳號已啟用。
+      {{ $t('subscription.successBanner') }}
     </div>
     <div v-if="checkoutResult === 'cancel'" class="banner cancel-banner">
-      訂閱已取消，隨時可以重新選擇方案。
+      {{ $t('subscription.cancelBanner') }}
     </div>
 
     <!-- Current subscription info (if logged in and subscribed) -->
     <section v-if="currentSub" class="current-sub-card">
       <div>
-        <p class="eyebrow">Current Plan</p>
+        <p class="eyebrow">{{ $t('subscription.currentPlan') }}</p>
         <p class="current-tier">{{ activeTier?.display_name ?? currentSub.tier_code }}</p>
         <p class="current-status">
-          狀態：<strong>{{ statusLabel(currentSub.status) }}</strong>
+          {{ $t('subscription.statusLabel') }}：<strong>{{ statusLabel(currentSub.status) }}</strong>
           <span v-if="currentSub.current_period_end">
-            · 到期日 {{ formatDate(currentSub.current_period_end) }}
+            · {{ $t('subscription.expiryLabel') }} {{ formatDate(currentSub.current_period_end) }}
           </span>
         </p>
       </div>
       <button class="outline-btn" type="button" :disabled="portalLoading" @click="goPortal">
-        {{ portalLoading ? '跳轉中...' : '管理訂閱' }}
+        {{ portalLoading ? $t('subscription.redirecting') : $t('subscription.manageBtn') }}
       </button>
     </section>
 
@@ -42,15 +36,15 @@
       <!-- Lite -->
       <article class="pricing-card featured-card">
         <div class="plan-header">
-          <p class="eyebrow">Most Popular</p>
+          <p class="eyebrow">{{ $t('subscription.mostPopular') }}</p>
           <h2>Lite</h2>
-          <p class="plan-price">$9 <span class="period">/ 月</span></p>
+          <p class="plan-price">$9 <span class="period">{{ $t('subscription.perMonth') }}</span></p>
         </div>
         <ul class="plan-features">
-          <li>✓ 最多 100 個 Agent</li>
-          <li>✓ 每月 10 次模擬</li>
-          <li>✓ 報告匯出</li>
-          <li>✓ 7 種地區時間模型</li>
+          <li>✓ {{ $t('subscription.liteF1') }}</li>
+          <li>✓ {{ $t('subscription.liteF2') }}</li>
+          <li>✓ {{ $t('subscription.liteF3') }}</li>
+          <li>✓ {{ $t('subscription.liteF4') }}</li>
         </ul>
         <button
           class="primary-btn"
@@ -58,13 +52,13 @@
           :disabled="checkoutLoading || !isLoggedIn"
           @click="subscribe('lite')"
         >
-          <span v-if="checkoutLoading === 'lite'">跳轉中...</span>
-          <span v-else-if="!isLoggedIn">請先登入</span>
-          <span v-else>立即訂閱</span>
+          <span v-if="checkoutLoading === 'lite'">{{ $t('subscription.redirecting') }}</span>
+          <span v-else-if="!isLoggedIn">{{ $t('subscription.loginFirst') }}</span>
+          <span v-else>{{ $t('subscription.subscribeBtn') }}</span>
         </button>
         <p v-if="!isLoggedIn" class="login-hint">
-          <button class="text-link" type="button" @click="router.push('/')">登入 / 註冊</button>
-          後即可訂閱
+          <button class="text-link" type="button" @click="router.push('/')">{{ $t('subscription.loginHint') }}</button>
+          {{ $t('subscription.loginHintPost') }}
         </p>
         <p v-if="subError" class="error-text">{{ subError }}</p>
       </article>
@@ -72,34 +66,34 @@
       <!-- Premium (coming soon) -->
       <article class="pricing-card disabled-card">
         <div class="plan-header">
-          <p class="eyebrow coming-soon-tag">即將推出</p>
+          <p class="eyebrow coming-soon-tag">{{ $t('subscription.comingSoon') }}</p>
           <h2>Premium</h2>
-          <p class="plan-price plan-price--dim">$29 <span class="period">/ 月</span></p>
+          <p class="plan-price plan-price--dim">$29 <span class="period">{{ $t('subscription.perMonth') }}</span></p>
         </div>
         <ul class="plan-features dim-features">
-          <li>✓ 最多 10,000 個 Agent</li>
-          <li>✓ 每月 100 次模擬</li>
-          <li>✓ 進階報告分析</li>
-          <li>✓ 優先技術支援</li>
+          <li>✓ {{ $t('subscription.premiumF1') }}</li>
+          <li>✓ {{ $t('subscription.premiumF2') }}</li>
+          <li>✓ {{ $t('subscription.premiumF3') }}</li>
+          <li>✓ {{ $t('subscription.premiumF4') }}</li>
         </ul>
-        <button class="disabled-btn" type="button" disabled>即將推出</button>
+        <button class="disabled-btn" type="button" disabled>{{ $t('subscription.comingSoon') }}</button>
       </article>
 
       <!-- Pro (coming soon) -->
       <article class="pricing-card disabled-card">
         <div class="plan-header">
-          <p class="eyebrow coming-soon-tag">即將推出</p>
+          <p class="eyebrow coming-soon-tag">{{ $t('subscription.comingSoon') }}</p>
           <h2>Pro</h2>
-          <p class="plan-price plan-price--dim">聯繫報價</p>
+          <p class="plan-price plan-price--dim">{{ $t('subscription.proPrice') }}</p>
         </div>
         <ul class="plan-features dim-features">
-          <li>✓ 無限 Agent 規模</li>
-          <li>✓ 無限次模擬</li>
-          <li>✓ 客製化地區模型</li>
-          <li>✓ 專屬帳號支援</li>
-          <li>✓ SLA 保障</li>
+          <li>✓ {{ $t('subscription.proF1') }}</li>
+          <li>✓ {{ $t('subscription.proF2') }}</li>
+          <li>✓ {{ $t('subscription.proF3') }}</li>
+          <li>✓ {{ $t('subscription.proF4') }}</li>
+          <li>✓ {{ $t('subscription.proF5') }}</li>
         </ul>
-        <button class="disabled-btn" type="button" disabled>即將推出</button>
+        <button class="disabled-btn" type="button" disabled>{{ $t('subscription.comingSoon') }}</button>
       </article>
     </section>
   </main>
@@ -108,6 +102,7 @@
 <script setup>
 import { computed, onMounted, ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import { authState } from '../store/auth'
 import {
   getSubscriptionStatus,
@@ -117,6 +112,7 @@ import {
 
 const router = useRouter()
 const route  = useRoute()
+const { t, locale } = useI18n()
 
 const isLoggedIn    = computed(() => !!authState.token)
 const checkoutLoading = ref('')
@@ -146,7 +142,7 @@ const subscribe = async (tierCode) => {
     const url = res.data?.checkout_url
     if (url) window.location.href = url
   } catch (err) {
-    subError.value = err.message || '建立結帳工作階段失敗'
+    subError.value = err.message || t('subscription.checkoutError')
   } finally {
     checkoutLoading.value = ''
   }
@@ -159,25 +155,26 @@ const goPortal = async () => {
     const url = res.data?.portal_url
     if (url) window.location.href = url
   } catch (err) {
-    subError.value = err.message || '建立客戶入口失敗'
+    subError.value = err.message || t('subscription.portalError')
   } finally {
     portalLoading.value = false
   }
 }
 
 const statusLabel = (s) => ({
-  active:              '使用中',
-  trialing:            '試用中',
-  canceled:            '已取消',
-  past_due:            '付款逾期',
-  incomplete:          '未完成',
-  incomplete_expired:  '已過期',
-  unpaid:              '未付款',
+  active:              t('subscription.statusActive'),
+  trialing:            t('subscription.statusTrialing'),
+  canceled:            t('subscription.statusCanceled'),
+  past_due:            t('subscription.statusPastDue'),
+  incomplete:          t('subscription.statusIncomplete'),
+  incomplete_expired:  t('subscription.statusExpired'),
+  unpaid:              t('subscription.statusUnpaid'),
 }[s] || s)
 
 const formatDate = (iso) => {
   if (!iso) return ''
-  return new Date(iso).toLocaleDateString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric' })
+  const lang = locale.value === 'en' ? 'en-US' : locale.value === 'zh' ? 'zh-CN' : 'zh-TW'
+  return new Date(iso).toLocaleDateString(lang, { year: 'numeric', month: 'long', day: 'numeric' })
 }
 
 onMounted(loadStatus)
@@ -192,29 +189,9 @@ onMounted(loadStatus)
   font-family: 'JetBrains Mono', 'Noto Sans TC', monospace;
 }
 
-.sub-nav {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 16px 32px;
-  border-bottom: 1px solid #111;
-  background: #fff;
-}
-
-.back-btn {
-  width: 38px;
-  height: 38px;
-  border: 1px solid #111;
-  background: #fff;
-  color: #111;
-  font-weight: 800;
-  cursor: pointer;
-  font-family: inherit;
-}
-
 .sub-hero {
   text-align: center;
-  padding: 56px 32px 32px;
+  padding: 48px 32px 32px;
 }
 
 .sub-hero h1 {
@@ -402,8 +379,7 @@ onMounted(loadStatus)
 .error-text { color: #d64545; font-size: 13px; font-weight: 800; margin: 0; }
 
 @media (max-width: 640px) {
-  .sub-nav     { padding: 12px 16px; }
-  .sub-hero    { padding: 40px 16px 24px; }
+  .sub-hero    { padding: 32px 16px 24px; }
   .pricing-grid { padding: 0 16px; }
   .current-sub-card { flex-direction: column; align-items: flex-start; }
 }

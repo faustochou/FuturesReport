@@ -1,31 +1,30 @@
 <template>
   <main class="admin-page">
     <section class="admin-header">
-      <button class="back-btn" type="button" @click="router.push('/')">←</button>
       <div>
-        <p class="eyebrow">Admin Console</p>
-        <h1>後台管理系統</h1>
+        <p class="eyebrow">{{ $t('admin.consoleLabel') }}</p>
+        <h1>{{ $t('admin.title') }}</h1>
       </div>
-      <button v-if="admin" class="logout-btn" type="button" @click="logoutAdmin">登出</button>
+      <button v-if="admin" class="logout-btn" type="button" @click="logoutAdmin">{{ $t('admin.logout') }}</button>
     </section>
 
     <!-- ── Login ── -->
     <section v-if="!admin" class="login-panel">
-      <h2>管理員登入</h2>
+      <h2>{{ $t('admin.loginTitle') }}</h2>
       <form class="form-grid" @submit.prevent="submitAdminLogin">
         <label>
-          <span>管理員帳號</span>
+          <span>{{ $t('admin.loginUsername') }}</span>
           <input v-model.trim="loginForm.username" autocomplete="username" required />
         </label>
         <label>
-          <span>管理員密碼</span>
+          <span>{{ $t('admin.loginPassword') }}</span>
           <input v-model="loginForm.password" autocomplete="current-password" type="password" required />
         </label>
         <button class="primary-btn" type="submit" :disabled="loading">
-          {{ loading ? '登入中...' : '登入後台' }}
+          {{ loading ? $t('admin.loggingIn') : $t('admin.loginBtn') }}
         </button>
       </form>
-      <p class="hint">請使用第一個註冊的帳號登入後台；後續註冊者皆為一般用戶。</p>
+      <p class="hint">{{ $t('admin.loginHint') }}</p>
       <p v-if="error" class="error-text">{{ error }}</p>
     </section>
 
@@ -39,7 +38,7 @@
           :class="{ active: activeTab === tab.id }"
           type="button"
           @click="activeTab = tab.id"
-        >{{ tab.label }}</button>
+        >{{ $t(`admin.${tab.labelKey}`) }}</button>
       </nav>
 
       <!-- ── Dashboard ── -->
@@ -47,30 +46,30 @@
         <div class="stat-grid">
           <div class="stat-card">
             <p class="stat-value">{{ stats.total_users ?? '—' }}</p>
-            <p class="stat-label">總用戶數</p>
+            <p class="stat-label">{{ $t('admin.statTotalUsers') }}</p>
           </div>
           <div class="stat-card">
             <p class="stat-value">{{ stats.active_users ?? '—' }}</p>
-            <p class="stat-label">啟用帳號</p>
+            <p class="stat-label">{{ $t('admin.statActiveUsers') }}</p>
           </div>
           <div class="stat-card">
             <p class="stat-value">{{ stats.admin_users ?? '—' }}</p>
-            <p class="stat-label">管理員數</p>
+            <p class="stat-label">{{ $t('admin.statAdmins') }}</p>
           </div>
           <div class="stat-card">
             <p class="stat-value">{{ stats.llm_configured ?? '—' }}</p>
-            <p class="stat-label">已設 LLM</p>
+            <p class="stat-label">{{ $t('admin.statLlm') }}</p>
           </div>
           <div v-if="system.memory_percent !== undefined" class="stat-card">
             <p class="stat-value">{{ system.memory_percent }}%</p>
-            <p class="stat-label">記憶體使用</p>
+            <p class="stat-label">{{ $t('admin.statMemory') }}</p>
           </div>
           <div v-if="system.cpu_percent !== undefined" class="stat-card">
             <p class="stat-value">{{ system.cpu_percent }}%</p>
-            <p class="stat-label">CPU 使用</p>
+            <p class="stat-label">{{ $t('admin.statCpu') }}</p>
           </div>
         </div>
-        <button class="icon-btn refresh-btn" type="button" @click="loadDashboard">↻ 刷新</button>
+        <button class="icon-btn refresh-btn" type="button" @click="loadDashboard">{{ $t('admin.refresh') }}</button>
       </section>
 
       <!-- ── User Management ── -->
@@ -78,14 +77,14 @@
         <aside class="user-list">
           <div class="section-title">
             <div>
-              <p class="eyebrow">Registered Users</p>
-              <h2>註冊用戶列表</h2>
+              <p class="eyebrow">{{ $t('admin.registeredUsers') }}</p>
+              <h2>{{ $t('admin.userListTitle') }}</h2>
             </div>
             <button class="icon-btn" type="button" title="Refresh" @click="loadUsers">↻</button>
           </div>
 
           <label class="search-box">
-            <span>搜尋</span>
+            <span>{{ $t('admin.search') }}</span>
             <input v-model.trim="query" placeholder="username / provider / model" />
           </label>
 
@@ -104,7 +103,7 @@
               </span>
               <span class="badges">
                 <span class="pill admin-pill" v-if="user.is_admin">Admin</span>
-                <span class="pill inactive-pill" v-if="!user.is_active">停用</span>
+                <span class="pill inactive-pill" v-if="!user.is_active">{{ $t('admin.disabled') }}</span>
                 <span class="pill" :class="{ ready: user.llm_configured }">
                   {{ user.llm_configured ? 'LLM ✓' : 'LLM —' }}
                 </span>
@@ -112,7 +111,7 @@
                   class="pill"
                   :class="user.subscription?.status === 'active' ? 'sub-active-pill' : 'sub-none-pill'"
                 >
-                  {{ user.subscription ? user.subscription.tier_code : '無訂閱' }}
+                  {{ user.subscription ? user.subscription.tier_code : $t('admin.noSub') }}
                 </span>
               </span>
             </button>
@@ -123,12 +122,12 @@
           <template v-if="selectedUser">
             <div class="section-title">
               <div>
-                <p class="eyebrow">Edit User</p>
-                <h2>編輯 {{ selectedUser.username }}</h2>
+                <p class="eyebrow">{{ $t('admin.editUser') }}</p>
+                <h2>{{ $t('admin.editUserTitle', { username: selectedUser.username }) }}</h2>
               </div>
               <div class="header-badges">
                 <span class="pill admin-pill" v-if="selectedUser.is_admin">Admin</span>
-                <span class="pill inactive-pill" v-if="!selectedUser.is_active">已停用</span>
+                <span class="pill inactive-pill" v-if="!selectedUser.is_active">{{ $t('admin.alreadyDisabled') }}</span>
                 <span class="pill ready" v-if="selectedUser.llm_configured">
                   API Key: {{ selectedUser.llm?.api_key_hint }}
                 </span>
@@ -138,25 +137,25 @@
             <!-- Basic info form -->
             <form class="editor-form" @submit.prevent="saveUser">
               <label>
-                <span>用戶名稱</span>
+                <span>{{ $t('admin.usernameLabel') }}</span>
                 <input v-model.trim="editForm.username" required minlength="3" />
               </label>
               <label>
-                <span>重設密碼</span>
-                <input v-model="editForm.password" type="password" minlength="8" placeholder="留空代表不更改" />
+                <span>{{ $t('admin.resetPassword') }}</span>
+                <input v-model="editForm.password" type="password" minlength="8" :placeholder="$t('admin.passwordPlaceholder')" />
               </label>
               <div class="divider"></div>
               <label>
-                <span>LLM 服務商</span>
+                <span>{{ $t('admin.llmProvider') }}</span>
                 <select v-model="editForm.llm.provider" @change="syncProviderDefaults">
-                  <option value="">不修改 / 未設定</option>
+                  <option value="">{{ $t('admin.noModify') }}</option>
                   <option v-for="(provider, key) in providers" :key="key" :value="key">
                     {{ provider.label }}
                   </option>
                 </select>
               </label>
               <label>
-                <span>模型</span>
+                <span>{{ $t('admin.model') }}</span>
                 <select v-if="currentModels.length" v-model="editForm.llm.model">
                   <option v-for="model in currentModels" :key="model" :value="model">{{ model }}</option>
                 </select>
@@ -167,15 +166,15 @@
                 <input v-model.trim="editForm.llm.base_url" />
               </label>
               <label>
-                <span>API Key</span>
-                <input v-model="editForm.llm.api_key" type="password" placeholder="留空代表沿用原本 Key" />
+                <span>{{ $t('admin.apiKey') }}</span>
+                <input v-model="editForm.llm.api_key" type="password" :placeholder="$t('admin.apiKeyPlaceholder')" />
               </label>
               <label class="check-row">
                 <input v-model="editForm.llm.clear" type="checkbox" />
-                <span>清除這位用戶的 LLM 設定</span>
+                <span>{{ $t('admin.clearLlm') }}</span>
               </label>
               <button class="primary-btn" type="submit" :disabled="loading">
-                {{ loading ? '儲存中...' : '儲存帳號 / LLM 變更' }}
+                {{ loading ? $t('admin.saving') : $t('admin.saveBtn') }}
               </button>
             </form>
 
@@ -186,26 +185,26 @@
                 type="button"
                 :disabled="loading || selectedUser.is_admin"
                 @click="promoteUser"
-              >↑ 升為管理員</button>
+              >{{ $t('admin.promoteBtn') }}</button>
               <button
                 class="action-btn demote-btn"
                 type="button"
                 :disabled="loading || !selectedUser.is_admin"
                 @click="demoteUser"
-              >↓ 降為一般用戶</button>
+              >{{ $t('admin.demoteBtn') }}</button>
               <button
                 class="action-btn"
                 :class="selectedUser.is_active ? 'disable-btn' : 'enable-btn'"
                 type="button"
                 :disabled="loading"
                 @click="toggleActive"
-              >{{ selectedUser.is_active ? '⊘ 停用帳號' : '✓ 啟用帳號' }}</button>
+              >{{ selectedUser.is_active ? $t('admin.disableBtn') : $t('admin.enableBtn') }}</button>
               <button
                 class="action-btn delete-btn"
                 type="button"
                 :disabled="loading"
                 @click="confirmDelete"
-              >✕ 刪除用戶</button>
+              >{{ $t('admin.deleteBtn') }}</button>
             </div>
 
             <p v-if="message" class="success-text">{{ message }}</p>
@@ -214,27 +213,27 @@
             <!-- Subscription override -->
             <div class="divider"></div>
             <div class="sub-mgmt">
-              <p class="eyebrow">訂閱管理（管理員覆寫）</p>
+              <p class="eyebrow">{{ $t('admin.subMgmt') }}</p>
               <p class="sub-current-line">
-                目前方案：
+                {{ $t('admin.currentPlanLabel') }}：
                 <span
                   class="pill"
                   :class="selectedUser.subscription?.status === 'active' ? 'sub-active-pill' : ''"
                 >
-                  {{ selectedUser.subscription ? selectedUser.subscription.tier_code : '無訂閱' }}
+                  {{ selectedUser.subscription ? selectedUser.subscription.tier_code : $t('admin.noSub2') }}
                 </span>
                 <span v-if="selectedUser.subscription?.stripe_subscription_id" class="sub-via">
-                  （Stripe 訂閱）
+                  {{ $t('admin.stripeSub') }}
                 </span>
                 <span v-else-if="selectedUser.subscription" class="sub-via">
-                  （管理員設定）
+                  {{ $t('admin.adminSub') }}
                 </span>
               </p>
               <div class="inline-row sub-action-row">
                 <select v-model="subForm.tierCode" class="sub-select">
-                  <option value="">撤銷訂閱</option>
-                  <option v-for="t in tiers" :key="t.tier_code" :value="t.tier_code">
-                    {{ t.display_name }}
+                  <option value="">{{ $t('admin.revokeOption') }}</option>
+                  <option v-for="tier in tiers" :key="tier.tier_code" :value="tier.tier_code">
+                    {{ tier.display_name }}
                   </option>
                 </select>
                 <button
@@ -242,17 +241,17 @@
                   type="button"
                   :disabled="subLoading"
                   @click="setSubscription"
-                >{{ subLoading ? '套用中...' : '套用' }}</button>
+                >{{ subLoading ? $t('admin.applying') : $t('admin.applyBtn') }}</button>
               </div>
-              <p class="sub-hint">套用後立即生效，無需 Stripe 付款流程。</p>
+              <p class="sub-hint">{{ $t('admin.applyHint') }}</p>
               <p v-if="subMessage" class="success-text">{{ subMessage }}</p>
               <p v-if="subError" class="error-text">{{ subError }}</p>
             </div>
           </template>
 
           <div v-else class="empty-state">
-            <h2>選擇一位用戶</h2>
-            <p>從左側列表選取註冊用戶後，可以編輯帳號與 LLM API 設定。</p>
+            <h2>{{ $t('admin.selectUser') }}</h2>
+            <p>{{ $t('admin.selectUserDesc') }}</p>
           </div>
         </section>
       </section>
@@ -261,8 +260,8 @@
       <section v-if="activeTab === 'versions'" class="version-panel">
         <div class="section-title">
           <div>
-            <p class="eyebrow">Version Management</p>
-            <h2>版本更新紀錄</h2>
+            <p class="eyebrow">{{ $t('admin.versionMgmt') }}</p>
+            <h2>{{ $t('admin.versionTitle') }}</h2>
           </div>
           <button class="icon-btn" type="button" @click="loadVersions">↻</button>
         </div>
@@ -279,24 +278,24 @@
             <p>{{ item.summary }}</p>
             <div class="change-columns">
               <div class="change-column">
-                <h4>新增</h4>
+                <h4>{{ $t('admin.added') }}</h4>
                 <ul>
                   <li v-for="change in item.added" :key="change">{{ change }}</li>
-                  <li v-if="!item.added?.length" class="muted">無</li>
+                  <li v-if="!item.added?.length" class="muted">{{ $t('admin.none') }}</li>
                 </ul>
               </div>
               <div class="change-column">
-                <h4>修改</h4>
+                <h4>{{ $t('admin.modified') }}</h4>
                 <ul>
                   <li v-for="change in item.modified" :key="change">{{ change }}</li>
-                  <li v-if="!item.modified?.length" class="muted">無</li>
+                  <li v-if="!item.modified?.length" class="muted">{{ $t('admin.none') }}</li>
                 </ul>
               </div>
               <div class="change-column">
-                <h4>刪除</h4>
+                <h4>{{ $t('admin.deleted') }}</h4>
                 <ul>
                   <li v-for="change in item.deleted" :key="change">{{ change }}</li>
-                  <li v-if="!item.deleted?.length" class="muted">無</li>
+                  <li v-if="!item.deleted?.length" class="muted">{{ $t('admin.none') }}</li>
                 </ul>
               </div>
             </div>
@@ -308,8 +307,8 @@
       <section v-if="activeTab === 'stripe'" class="settings-panel">
         <div class="section-title">
           <div>
-            <p class="eyebrow">Payment Gateway</p>
-            <h2>金流設定</h2>
+            <p class="eyebrow">{{ $t('admin.paymentGateway') }}</p>
+            <h2>{{ $t('admin.stripeTitle') }}</h2>
           </div>
           <button class="icon-btn" type="button" @click="loadStripeSettings">↻</button>
         </div>
@@ -317,13 +316,13 @@
         <div v-if="stripeSettings" class="settings-grid">
           <!-- Status row -->
           <div class="setting-card">
-            <p class="setting-label">串接狀態</p>
+            <p class="setting-label">{{ $t('admin.stripeStatus') }}</p>
             <p class="setting-value">
               <span class="pill" :class="stripeSettings.is_configured ? 'ready' : ''">
-                {{ stripeSettings.is_configured ? '✓ 已設定' : '✕ 未設定' }}
+                {{ stripeSettings.is_configured ? $t('admin.configured') : $t('admin.notConfigured') }}
               </span>
               <span v-if="stripeSettings.is_configured" class="pill mode-pill">
-                {{ stripeSettings.is_test_mode ? '測試模式' : '正式模式' }}
+                {{ stripeSettings.is_test_mode ? $t('admin.testMode') : $t('admin.liveMode') }}
               </span>
             </p>
           </div>
@@ -332,44 +331,44 @@
           <div class="setting-card">
             <p class="setting-label">Secret Key</p>
             <p class="setting-value mono">
-              {{ stripeSettings.secret_key_hint || '未設定' }}
-              <span class="hint-note">（僅顯示前7碼及後4碼，完整金鑰請在環境變數中管理）</span>
+              {{ stripeSettings.secret_key_hint || $t('admin.notSet') }}
+              <span class="hint-note">{{ $t('admin.keyHint') }}</span>
             </p>
           </div>
 
           <!-- Publishable key -->
           <div class="setting-card">
             <p class="setting-label">Publishable Key</p>
-            <p class="setting-value mono">{{ stripeSettings.publishable_key_hint || '未設定' }}</p>
+            <p class="setting-value mono">{{ stripeSettings.publishable_key_hint || $t('admin.notSet') }}</p>
           </div>
 
           <!-- Webhook -->
           <div class="setting-card webhook-card">
-            <p class="setting-label">Webhook 端點 URL</p>
+            <p class="setting-label">{{ $t('admin.webhookUrl') }}</p>
             <div class="webhook-row">
               <code class="webhook-url">{{ stripeSettings.webhook_url }}</code>
-              <button class="icon-btn copy-btn" type="button" @click="copyWebhookUrl" title="複製">⎘</button>
+              <button class="icon-btn copy-btn" type="button" @click="copyWebhookUrl" title="Copy">⎘</button>
             </div>
-            <p class="hint-note">請將此 URL 貼到 Stripe Dashboard → Developers → Webhooks</p>
-            <p class="hint-note">需啟用事件：checkout.session.completed、customer.subscription.updated、customer.subscription.deleted、invoice.payment_failed</p>
+            <p class="hint-note">{{ $t('admin.webhookPasteHint') }}</p>
+            <p class="hint-note">{{ $t('admin.webhookEventsHint') }}</p>
             <p class="setting-value">
               <span class="pill" :class="stripeSettings.webhook_configured ? 'ready' : ''">
-                Webhook Secret {{ stripeSettings.webhook_configured ? '✓ 已設定' : '✕ 未設定' }}
+                {{ $t('admin.webhookSecret') }} {{ stripeSettings.webhook_configured ? $t('admin.configured') : $t('admin.notConfigured') }}
               </span>
             </p>
           </div>
 
           <!-- Env var instructions -->
           <div class="setting-card env-card">
-            <p class="setting-label">環境變數設定說明</p>
+            <p class="setting-label">{{ $t('admin.envVarsTitle') }}</p>
             <pre class="env-block">STRIPE_SECRET_KEY=sk_test_...
 STRIPE_PUBLISHABLE_KEY=pk_test_...
 STRIPE_WEBHOOK_SECRET=whsec_...
 STRIPE_PRICE_ID_LITE=price_...</pre>
-            <p class="hint-note">取得金鑰：Stripe Dashboard → Developers → API Keys</p>
+            <p class="hint-note">{{ $t('admin.stripeKeyHint') }}</p>
           </div>
         </div>
-        <p v-else class="muted">讀取中...</p>
+        <p v-else class="muted">{{ $t('admin.loadingText') }}</p>
         <p v-if="stripeError" class="error-text">{{ stripeError }}</p>
       </section>
 
@@ -377,8 +376,8 @@ STRIPE_PRICE_ID_LITE=price_...</pre>
       <section v-if="activeTab === 'tiers'" class="tiers-panel">
         <div class="section-title">
           <div>
-            <p class="eyebrow">Subscription Plans</p>
-            <h2>訂閱分級管理</h2>
+            <p class="eyebrow">{{ $t('admin.subPlansLabel') }}</p>
+            <h2>{{ $t('admin.tierTitle') }}</h2>
           </div>
           <button class="icon-btn" type="button" @click="loadTiers">↻</button>
         </div>
@@ -391,7 +390,7 @@ STRIPE_PRICE_ID_LITE=price_...</pre>
                 <code class="tier-code">{{ tier.tier_code }}</code>
               </div>
               <span class="pill" :class="tier.is_available ? 'ready' : 'unavail-pill'">
-                {{ tier.is_available ? '上架中' : '尚未開放' }}
+                {{ tier.is_available ? $t('admin.available') : $t('admin.unavailable') }}
               </span>
             </div>
 
@@ -404,7 +403,7 @@ STRIPE_PRICE_ID_LITE=price_...</pre>
                   @change="toggleTierAvailability(tier)"
                   :disabled="tierLoading === tier.tier_code"
                 />
-                <span>開放此方案（上架）</span>
+                <span>{{ $t('admin.enableTier') }}</span>
               </label>
 
               <!-- Stripe Price ID -->
@@ -422,13 +421,13 @@ STRIPE_PRICE_ID_LITE=price_...</pre>
                     type="button"
                     :disabled="tierLoading === tier.tier_code"
                     @click="saveTierPriceId(tier)"
-                  >儲存</button>
+                  >{{ $t('admin.savePriceId') }}</button>
                 </div>
               </label>
 
               <!-- Feature flags -->
               <label>
-                <span>功能開關 (JSON)</span>
+                <span>{{ $t('admin.flagsLabel') }}</span>
                 <textarea
                   :value="tierEdits[tier.tier_code]?.flags ?? JSON.stringify(tier.feature_flags, null, 2)"
                   @input="setTierEdit(tier.tier_code, 'flags', $event.target.value)"
@@ -441,7 +440,7 @@ STRIPE_PRICE_ID_LITE=price_...</pre>
                   type="button"
                   :disabled="tierLoading === tier.tier_code"
                   @click="saveTierFlags(tier)"
-                >儲存功能開關</button>
+                >{{ $t('admin.saveFlagsBtn') }}</button>
               </label>
 
               <p v-if="tierMessages[tier.tier_code]" class="success-text">{{ tierMessages[tier.tier_code] }}</p>
@@ -457,6 +456,7 @@ STRIPE_PRICE_ID_LITE=price_...</pre>
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import {
   adminLogin,
   changeUserRole,
@@ -477,15 +477,16 @@ import {
 import DEFAULT_PROVIDERS from '../config/providers'
 
 const router = useRouter()
+const { t }  = useI18n()
 const admin  = ref(null)
 const activeTab = ref('dashboard')
 
 const tabs = [
-  { id: 'dashboard', label: '系統總覽' },
-  { id: 'users',     label: '用戶管理' },
-  { id: 'stripe',    label: '金流設定' },
-  { id: 'tiers',     label: '訂閱分級' },
-  { id: 'versions',  label: '版本紀錄' },
+  { id: 'dashboard', labelKey: 'tabDashboard' },
+  { id: 'users',     labelKey: 'tabUsers' },
+  { id: 'stripe',    labelKey: 'tabStripe' },
+  { id: 'tiers',     labelKey: 'tabTiers' },
+  { id: 'versions',  labelKey: 'tabVersions' },
 ]
 
 // Dashboard
@@ -561,7 +562,7 @@ const submitAdminLogin = async () => {
     loginForm.password = ''
     await loadDashboard()
   } catch (err) {
-    error.value = err.message || '後台登入失敗'
+    error.value = err.message || t('admin.loginFailed')
   } finally {
     loading.value = false
   }
@@ -598,7 +599,7 @@ const loadDashboard = async () => {
     stats.value  = res.data?.stats  || {}
     system.value = res.data?.system || {}
   } catch (err) {
-    error.value = err.message || '讀取系統資訊失敗'
+    error.value = err.message || t('admin.loadDashboardFailed')
   }
 }
 
@@ -616,7 +617,7 @@ const loadUsers = async () => {
       if (refreshed) selectUser(refreshed)
     }
   } catch (err) {
-    error.value = err.message || '讀取用戶列表失敗'
+    error.value = err.message || t('admin.loadUsersFailed')
   } finally {
     loading.value = false
   }
@@ -627,7 +628,7 @@ const loadVersions = async () => {
     const res    = await getVersionHistory()
     versions.value = res.data?.versions || []
   } catch (err) {
-    error.value = err.message || '讀取版本紀錄失敗'
+    error.value = err.message || t('admin.loadVersionsFailed')
   }
 }
 
@@ -656,10 +657,10 @@ const setSubscription = async () => {
     const res = await setUserSubscription(selectedUser.value.user_id, subForm.tierCode || null)
     _refreshUser(res.data)
     subMessage.value = subForm.tierCode
-      ? `已設定為 ${subForm.tierCode} 方案`
-      : '已撤銷訂閱'
+      ? t('admin.setTierTo', { tier: subForm.tierCode })
+      : t('admin.revokedSub')
   } catch (err) {
-    subError.value = err.message || '操作失敗'
+    subError.value = err.message || t('admin.operationFailed')
   } finally {
     subLoading.value = false
   }
@@ -697,9 +698,9 @@ const saveUser = async () => {
     }
     const res = await updateAdminUser(selectedUser.value.user_id, payload)
     _refreshUser(res.data)
-    message.value = '已儲存用戶設定'
+    message.value = t('admin.saved')
   } catch (err) {
-    error.value = err.message || '儲存失敗'
+    error.value = err.message || t('admin.saveFailed')
   } finally {
     loading.value = false
   }
@@ -713,9 +714,9 @@ const promoteUser = async () => {
   try {
     const res = await changeUserRole(selectedUser.value.user_id, 'admin')
     _refreshUser(res.data)
-    message.value = '已升級為管理員'
+    message.value = t('admin.promoted')
   } catch (err) {
-    error.value = err.message || '操作失敗'
+    error.value = err.message || t('admin.operationFailed')
   } finally {
     loading.value = false
   }
@@ -723,16 +724,16 @@ const promoteUser = async () => {
 
 const demoteUser = async () => {
   if (!selectedUser.value) return
-  if (!confirm(`確定要將 ${selectedUser.value.username} 降為一般用戶？`)) return
+  if (!confirm(t('admin.confirmDemote', { username: selectedUser.value.username }))) return
   loading.value = true
   error.value   = ''
   message.value = ''
   try {
     const res = await changeUserRole(selectedUser.value.user_id, 'user')
     _refreshUser(res.data)
-    message.value = '已降為一般用戶'
+    message.value = t('admin.demoted')
   } catch (err) {
-    error.value = err.message || '操作失敗'
+    error.value = err.message || t('admin.operationFailed')
   } finally {
     loading.value = false
   }
@@ -747,9 +748,9 @@ const toggleActive = async () => {
   try {
     const res = await toggleUserActive(selectedUser.value.user_id, newState)
     _refreshUser(res.data)
-    message.value = newState ? '帳號已啟用' : '帳號已停用'
+    message.value = newState ? t('admin.accountEnabled') : t('admin.accountDisabled')
   } catch (err) {
-    error.value = err.message || '操作失敗'
+    error.value = err.message || t('admin.operationFailed')
   } finally {
     loading.value = false
   }
@@ -757,7 +758,7 @@ const toggleActive = async () => {
 
 const confirmDelete = async () => {
   if (!selectedUser.value) return
-  if (!confirm(`確定要永久刪除用戶 ${selectedUser.value.username}？此操作不可逆。`)) return
+  if (!confirm(t('admin.confirmDelete', { username: selectedUser.value.username }))) return
   loading.value = true
   error.value   = ''
   message.value = ''
@@ -765,9 +766,9 @@ const confirmDelete = async () => {
     await deleteUser(selectedUser.value.user_id)
     users.value       = users.value.filter(u => u.user_id !== selectedUser.value.user_id)
     selectedUser.value = null
-    message.value     = '用戶已刪除'
+    message.value     = t('admin.userDeleted')
   } catch (err) {
-    error.value = err.message || '刪除失敗'
+    error.value = err.message || t('admin.saveFailed')
   } finally {
     loading.value = false
   }
@@ -781,7 +782,7 @@ const loadStripeSettings = async () => {
     const res = await getStripeSettings()
     stripeSettings.value = res.data?.stripe || null
   } catch (err) {
-    stripeError.value = err.message || '讀取金流設定失敗'
+    stripeError.value = err.message || t('admin.loadStripeFailed')
   }
 }
 
@@ -798,7 +799,7 @@ const loadTiers = async () => {
     const res = await listAdminTiers()
     tiers.value = res.data?.tiers || []
   } catch (err) {
-    error.value = err.message || '讀取方案列表失敗'
+    error.value = err.message || t('admin.loadTiersFailed')
   }
 }
 
@@ -817,9 +818,9 @@ const _saveTier = async (tier, payload) => {
     tiers.value = tiers.value.map(t =>
       t.tier_code === tier.tier_code ? updated : t
     )
-    tierMessages[tier.tier_code] = '已儲存'
+    tierMessages[tier.tier_code] = t('admin.savedConfirm')
   } catch (err) {
-    tierErrors[tier.tier_code] = err.message || '儲存失敗'
+    tierErrors[tier.tier_code] = err.message || t('admin.saveFailed')
   } finally {
     tierLoading.value = ''
   }
@@ -840,7 +841,7 @@ const saveTierFlags = (tier) => {
   try {
     parsed = JSON.parse(raw)
   } catch {
-    tierErrors[tier.tier_code] = 'JSON 格式錯誤，請檢查語法'
+    tierErrors[tier.tier_code] = t('admin.flagsJsonError')
     return
   }
   _saveTier(tier, { feature_flags: parsed })
@@ -852,16 +853,16 @@ onMounted(loadAdminSession)
 <style scoped>
 .admin-page {
   min-height: 100vh;
-  padding: 72px 32px 32px;
+  padding: 24px 32px 32px;
   background: #f6f6f1;
   color: #111;
   font-family: 'JetBrains Mono', 'Noto Sans TC', monospace;
 }
 
 .admin-header {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
+  display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
   margin-bottom: 20px;
 }
@@ -882,7 +883,7 @@ onMounted(loadAdminSession)
   text-transform: uppercase;
 }
 
-.back-btn, .icon-btn, .logout-btn, .primary-btn {
+.icon-btn, .logout-btn, .primary-btn {
   border: 1px solid #111;
   background: #fff;
   color: #111;
@@ -891,7 +892,7 @@ onMounted(loadAdminSession)
   font-family: inherit;
 }
 
-.back-btn, .icon-btn { width: 38px; height: 38px; }
+.icon-btn { width: 38px; height: 38px; }
 .logout-btn  { min-height: 38px; padding: 0 14px; }
 
 /* ── Tabs ── */

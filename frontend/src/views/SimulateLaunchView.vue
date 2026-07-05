@@ -1,15 +1,5 @@
 <template>
   <div class="launch-container">
-    <!-- Navbar -->
-    <nav class="navbar">
-      <div class="nav-brand">
-        <AppLogo variant="brand" />
-      </div>
-      <div class="nav-links">
-        <button class="back-btn" @click="router.push('/')">← {{ $t('common.back') }}</button>
-      </div>
-    </nav>
-
     <div class="launch-content">
 
       <!-- Gate: not logged in -->
@@ -242,44 +232,6 @@ const startSimulation = () => {
   color: var(--black);
 }
 
-.navbar {
-  height: 60px;
-  background: var(--black);
-  color: var(--white);
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 40px;
-}
-
-.nav-brand {
-  font-family: var(--font-mono);
-  font-weight: 800;
-  letter-spacing: 1px;
-  font-size: 1.2rem;
-}
-
-.nav-links {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-}
-
-.back-btn {
-  background: none;
-  border: 1px solid rgba(255,255,255,0.3);
-  color: var(--white);
-  padding: 6px 16px;
-  font-family: var(--font-mono);
-  font-size: 0.8rem;
-  cursor: pointer;
-  letter-spacing: 0.5px;
-  transition: border-color 0.2s;
-}
-
-.back-btn:hover {
-  border-color: var(--white);
-}
 
 .launch-content {
   max-width: 860px;

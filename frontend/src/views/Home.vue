@@ -1,8 +1,5 @@
 <template>
   <div class="home-container">
-    <!-- 頂部 Header（含語言切換 + 帳號） -->
-    <AppHeader />
-
     <div class="main-content">
       <!-- 上半部分：Hero 区域 -->
       <section class="hero-section">
@@ -215,8 +212,6 @@
 import { computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { authState } from '../store/auth'
-import AppHeader from '../components/AppHeader.vue'
-
 const router = useRouter()
 
 const hasActiveSubscription = computed(() => {

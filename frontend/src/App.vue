@@ -1,6 +1,7 @@
 <template>
-  <!-- 首頁由 AppHeader 自帶語言/帳號功能；其他頁面保留浮動工具列 -->
-  <div v-if="route.path !== '/'" class="global-tools">
+  <!-- 公開頁面使用 AppHeader；工作區頁面保留浮動工具列 -->
+  <AppHeader v-if="showAppHeader" />
+  <div v-else class="global-tools">
     <LanguageSwitcher />
     <AuthPanel />
   </div>
@@ -8,11 +9,16 @@
 </template>
 
 <script setup>
+import { computed } from 'vue'
 import { useRoute } from 'vue-router'
+import AppHeader from './components/AppHeader.vue'
 import AuthPanel from './components/AuthPanel.vue'
 import LanguageSwitcher from './components/LanguageSwitcher.vue'
 
 const route = useRoute()
+
+const PUBLIC_ROUTES = ['/', '/launch', '/subscription', '/admin']
+const showAppHeader = computed(() => PUBLIC_ROUTES.includes(route.path))
 </script>
 
 <style>
