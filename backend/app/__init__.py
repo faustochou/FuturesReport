@@ -119,8 +119,23 @@ def create_app(config_class=Config):
             data['memory'] = {'note': 'psutil not available'}
         return data
     
+    # Serve built frontend in production. No-op when frontend/dist doesn't exist (dev mode).
+    _dist = os.path.normpath(
+        os.path.join(os.path.dirname(__file__), '../../frontend/dist')
+    )
+    if os.path.isdir(_dist):
+        from flask import send_from_directory as _send
+
+        @app.route('/', defaults={'path': ''})
+        @app.route('/<path:path>')
+        def _spa(path):
+            full = os.path.join(_dist, path)
+            if path and os.path.isfile(full):
+                return _send(_dist, path)
+            return _send(_dist, 'index.html')
+
     if should_log_startup:
         logger.info("Futures Report Backend 启动完成")
-    
+
     return app
 
