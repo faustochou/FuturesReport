@@ -31,8 +31,6 @@
             <span>{{ hasActiveSubscription ? $t('home.ctaStart') : $t('home.ctaSubscribe') }}</span>
             <span class="cta-arrow">→</span>
           </button>
-
-          <div class="decoration-square"></div>
         </div>
 
         <div class="hero-right">
@@ -40,10 +38,6 @@
           <div class="logo-container">
             <AppLogo variant="hero" class="hero-logo" />
           </div>
-
-          <button class="scroll-down-btn" @click="scrollToBottom">
-            ↓
-          </button>
         </div>
       </section>
 
@@ -71,6 +65,8 @@
             </div>
           </div>
         </div>
+
+        <div class="home-divider"></div>
 
         <!-- Row 2: 工作流序列 — 横向 -->
         <div class="workflow-flow">
@@ -151,9 +147,7 @@
 
             <!-- Header: title + description -->
             <div class="method-header">
-              <div class="method-header-top">
-                <span class="method-status-dot"></span>
-              </div>
+              <div class="method-header-top"></div>
               <h2 class="method-title">{{ $t('home.methodologyTitle') }}</h2>
               <p class="method-desc">{{ $t('home.methodologyDesc') }}</p>
             </div>
@@ -264,10 +258,6 @@ const hasActiveSubscription = computed(() => {
   return sub.status === 'active' && ['lite', 'premium', 'pro'].includes(sub.tier_code)
 })
 
-const scrollToBottom = () => {
-  window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })
-}
-
 const goToLaunch = () => {
   router.push(hasActiveSubscription.value ? '/launch' : '/subscription')
 }
@@ -284,7 +274,7 @@ onMounted(async () => {
 
 <style scoped>
 /* 全局变量与重置 */
-:root {
+.home-container {
   --black: #000000;
   --white: #FFFFFF;
   --orange: #FF4500;
@@ -346,7 +336,7 @@ onMounted(async () => {
 }
 
 .orange-tag {
-  background: var(--orange);
+  background: var(--black);
   color: var(--white);
   padding: 4px 10px;
   font-weight: 700;
@@ -396,7 +386,7 @@ onMounted(async () => {
 }
 
 .highlight-orange {
-  color: var(--orange);
+  color: var(--black);
   font-weight: 700;
   font-family: var(--font-mono);
 }
@@ -416,13 +406,13 @@ onMounted(async () => {
   font-weight: 520;
   color: var(--black);
   letter-spacing: 1px;
-  border-left: 3px solid var(--orange);
+  border-left: 3px solid var(--black);
   padding-left: 15px;
   margin-top: 20px;
 }
 
 .blinking-cursor {
-  color: var(--orange);
+  color: var(--black);
   animation: blink 1s step-end infinite;
   font-weight: 700;
 }
@@ -430,12 +420,6 @@ onMounted(async () => {
 @keyframes blink {
   0%, 100% { opacity: 1; }
   50% { opacity: 0; }
-}
-
-.decoration-square {
-  width: 16px;
-  height: 16px;
-  background: var(--orange);
 }
 
 .hero-right {
@@ -458,24 +442,6 @@ onMounted(async () => {
   width: 100%;
 }
 
-.scroll-down-btn {
-  width: 40px;
-  height: 40px;
-  border: 1px solid var(--border);
-  background: transparent;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--orange);
-  font-size: 1.2rem;
-  transition: all 0.2s;
-}
-
-.scroll-down-btn:hover {
-  border-color: var(--orange);
-}
-
 /* Dashboard 三行布局 */
 .dashboard-section {
   display: flex;
@@ -492,8 +458,14 @@ onMounted(async () => {
   justify-content: space-between;
   gap: 60px;
   border: 1px solid var(--border);
-  border-bottom: none;
   padding: 36px 36px;
+}
+
+.home-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--black);
+  margin: 32px 0;
 }
 
 .status-main {
@@ -602,7 +574,7 @@ onMounted(async () => {
 .diamond-icon {
   font-size: 1rem;
   line-height: 1;
-  color: var(--orange);
+  color: var(--black);
 }
 
 .flow-steps {
@@ -633,7 +605,7 @@ onMounted(async () => {
   left: 0;
   right: 0;
   height: 2px;
-  background: var(--orange);
+  background: var(--black);
   transform: scaleX(0);
   transition: transform 0.3s ease;
 }
@@ -643,13 +615,13 @@ onMounted(async () => {
 }
 
 .flow-step:hover {
-  background: rgba(255, 69, 0, 0.02);
+  background: rgba(0, 0, 0, 0.02);
 }
 
 .flow-icon {
   width: 46px;
   height: 46px;
-  color: var(--orange);
+  color: var(--black);
   margin-bottom: 18px;
   opacity: 0.75;
   transition: opacity 0.2s, transform 0.25s;
@@ -773,20 +745,6 @@ onMounted(async () => {
   letter-spacing: 2.5px;
   text-transform: uppercase;
   color: rgba(255, 255, 255, 0.35);
-}
-
-.method-status-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--orange);
-  box-shadow: 0 0 8px rgba(255, 69, 0, 0.7);
-  animation: dot-pulse 2.4s ease-in-out infinite;
-}
-
-@keyframes dot-pulse {
-  0%, 100% { opacity: 1; box-shadow: 0 0 8px rgba(255,69,0,0.7); }
-  50%       { opacity: 0.5; box-shadow: 0 0 2px rgba(255,69,0,0.3); }
 }
 
 .method-title {
