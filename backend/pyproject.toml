@@ -46,9 +46,6 @@ dependencies = [
     # Background task queue (Celery + Redis) for moving heavy simulation out of main API
     "celery[redis]>=5.3.0",
     "redis>=5.0.0",
-
-    # Production WSGI server
-    "gunicorn>=21.0.0",
 ]
 
 [project.optional-dependencies]

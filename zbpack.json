@@ -2,6 +2,5 @@
   "dockerfile": {
     "path": "Dockerfile"
   },
-  "port": 8080,
-  "notes": "Single-port production setup: gunicorn on 8080 serves both API and built frontend. Healthcheck at /health. For K3s low-spec (2vCPU/4GB): set SIM_MAX_AGENTS=60 LLM_CONCURRENCY_LIMIT=6 SIM_MAX_ROUNDS=15."
+  "notes": "For Zeabur K3s low-spec (2vCPU/4GB): set resource limits in dashboard; use SIM_MAX_AGENTS=60 LLM_CONCURRENCY_LIMIT=6 SIM_MAX_ROUNDS=15 for safe dual-sim runs. Healthcheck at /health."
 }

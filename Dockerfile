@@ -1,6 +1,6 @@
 FROM python:3.11
 
-# Copy Node.js + npm from official image (no apt/NodeSource dependency)
+# 直接从官方 node:20-slim 镜像复制 Node.js + npm，完全不依赖 apt/NodeSource
 COPY --from=node:20-slim /usr/local/bin/node /usr/local/bin/node
 COPY --from=node:20-slim /usr/local/lib/node_modules/npm /usr/local/lib/node_modules/npm
 RUN ln -sf /usr/local/lib/node_modules/npm/bin/npm-cli.js /usr/local/bin/npm \
@@ -11,7 +11,6 @@ COPY --from=ghcr.io/astral-sh/uv:0.9.26 /uv /uvx /bin/
 WORKDIR /app
 
 ENV USER_DATA_DIR=/data
-ENV FLASK_DEBUG=False
 
 COPY package.json package-lock.json ./
 COPY frontend/package.json frontend/package-lock.json ./frontend/
@@ -23,17 +22,15 @@ RUN npm ci --include=dev \
 
 COPY . .
 
-# Build frontend into frontend/dist/ (served by Flask in production)
-RUN npm run build
-
-EXPOSE 8080
+EXPOSE 3000 5001
 
 VOLUME ["/data"]
 
-# Healthcheck hits the single gunicorn port
-HEALTHCHECK --interval=30s --timeout=10s --start-period=90s --retries=3 \
-  CMD python -c "import urllib.request,sys; sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8080/health',timeout=6).getcode()==200 else 1)" || exit 1
+# K8s / Zeabur 探针：轻量 healthcheck（使用 stdlib，避免依賴 curl）
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+  CMD python -c "import urllib.request,sys,os; p=os.environ.get('BACKEND_PORT','5001'); sys.exit(0 if urllib.request.urlopen(f'http://127.0.0.1:{p}/health',timeout=6).getcode()==200 else 1)" || exit 1
 
-# 1. Run Alembic migrations (abort on failure — wrong schema is worse than downtime)
-# 2. Start gunicorn: 2 workers × 4 threads, 120s timeout for long simulation calls
-CMD ["/bin/sh", "-c", "cd /app/backend && uv run alembic upgrade head && exec uv run gunicorn --bind 0.0.0.0:8080 --workers 2 --threads 4 --timeout 120 'app:create_app()'"]
+# Run Alembic migrations first, then start the application.
+# Using && so startup aborts if migrations fail (prevents running with wrong schema).
+# exec replaces sh with npm so SIGTERM from Docker/Zeabur reaches npm directly.
+CMD ["/bin/sh", "-c", "cd /app/backend && uv run alembic upgrade head && cd /app && exec npm run dev"]
