@@ -24,6 +24,7 @@ dependencies = [
 
     # 金流
     "stripe>=10.0.0",
+    "cryptography>=42.0.0",
 
     # Zep Cloud
     "zep-cloud==3.13.0",

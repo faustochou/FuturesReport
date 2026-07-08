@@ -8,7 +8,6 @@ stripe SDK >= 10.0: uses StripeClient.v1.* for API calls,
 and the module-level stripe.Webhook.construct_event() for webhook verification.
 """
 
-import os
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
@@ -17,6 +16,7 @@ import stripe
 from ..db.database import get_db
 from ..db.models import SubscriptionTier, UserSubscription
 from ..utils.logger import get_logger
+from . import payment_settings_service as pay_settings
 from sqlalchemy import select
 
 logger = get_logger("futuresreport.subscription")
@@ -28,39 +28,30 @@ logger = get_logger("futuresreport.subscription")
 
 def _get_stripe_client() -> stripe.StripeClient:
     """Lazy-initialise Stripe client.  Raises RuntimeError if key is missing."""
-    secret_key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
+    secret_key = pay_settings.get_stripe_secret_key()
     if not secret_key:
         raise RuntimeError(
-            "STRIPE_SECRET_KEY 未設定。請在 .env 或 Zeabur 環境變數中填入。"
+            "STRIPE_SECRET_KEY 未設定。請在後台「金流設定」或 .env / Zeabur 環境變數中填入。"
         )
     return stripe.StripeClient(secret_key)
 
 
 def is_stripe_configured() -> bool:
-    """Return True only when all required Stripe env vars are present."""
-    return bool(
-        os.environ.get("STRIPE_SECRET_KEY", "").strip()
-        and os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
-    )
+    """Return True only when both the secret key and webhook secret are set."""
+    return pay_settings.is_stripe_configured()
 
 
 def get_stripe_settings_summary() -> Dict[str, Any]:
     """Safe summary for the admin UI — never exposes secret key plaintext."""
-    secret_key = os.environ.get("STRIPE_SECRET_KEY", "").strip()
-    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
-    publishable_key = os.environ.get("STRIPE_PUBLISHABLE_KEY", "").strip()
-
-    def mask(key: str) -> Optional[str]:
-        if not key:
-            return None
-        return f"{key[:7]}...{key[-4:]}"
+    secret_key = pay_settings.get_stripe_secret_key() or ""
+    publishable_key = pay_settings.get_stripe_publishable_key() or ""
 
     return {
         "is_configured": is_stripe_configured(),
-        "secret_key_hint": mask(secret_key),
-        "publishable_key_hint": mask(publishable_key),
+        "secret_key_hint": pay_settings.mask(secret_key),
+        "publishable_key_hint": pay_settings.mask(publishable_key),
         "is_test_mode": secret_key.startswith("sk_test_"),
-        "webhook_configured": bool(webhook_secret),
+        "webhook_configured": bool(pay_settings.get_stripe_webhook_secret()),
         # Full URL is constructed by the admin API using request.host_url
         "webhook_path": "/api/subscription/webhook",
     }
@@ -294,7 +285,7 @@ def construct_webhook_event(payload: bytes, sig_header: str) -> Any:
     by the Stripe Python SDK.  payload must be the raw request bytes —
     never pass a decoded/re-serialised body.
     """
-    webhook_secret = os.environ.get("STRIPE_WEBHOOK_SECRET", "").strip()
+    webhook_secret = pay_settings.get_stripe_webhook_secret()
     if not webhook_secret:
         raise RuntimeError("STRIPE_WEBHOOK_SECRET 未設定")
     return stripe.Webhook.construct_event(payload, sig_header, webhook_secret)

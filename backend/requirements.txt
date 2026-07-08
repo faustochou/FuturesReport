@@ -36,3 +36,7 @@ pydantic>=2.0.0
 # Monitoring for resource usage on low-RAM deploys (K3s/Zeabur)
 psutil>=5.9.0
 
+# ============= 金流 =============
+# 用於加密後台儲存的金流密鑰 (Fernet)
+cryptography>=42.0.0
+
