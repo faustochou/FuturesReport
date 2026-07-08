@@ -216,7 +216,7 @@
                   <!-- 卡片头部 -->
                   <div class="agent-card-header">
                     <div class="agent-identity">
-                      <span class="agent-id">Agent {{ agent.agent_id }}</span>
+                      <span class="agent-id">AI Agent {{ agent.agent_id }}</span>
                       <span class="agent-name">{{ agent.entity_name }}</span>
                     </div>
                     <div class="agent-tags">
@@ -427,7 +427,7 @@
                     <div class="post-header">
                       <span class="post-role">{{ post.poster_type }}</span>
                       <span class="post-agent-info">
-                        <span class="post-id">Agent {{ post.poster_agent_id }}</span>
+                        <span class="post-id">AI Agent {{ post.poster_agent_id }}</span>
                         <span class="post-username">@{{ getAgentUsername(post.poster_agent_id) }}</span>
                       </span>
                     </div>

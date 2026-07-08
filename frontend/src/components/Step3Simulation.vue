@@ -283,7 +283,7 @@
 
         <div v-if="allActions.length === 0" class="waiting-state">
           <div class="pulse-ring"></div>
-          <span>Waiting for agent actions...</span>
+          <span>Waiting for AI Agent actions...</span>
         </div>
       </div>
     </div>
@@ -452,7 +452,7 @@ const doStartSimulation = async () => {
     // 低资源警告 (基于已知 profiles 或 maxRounds)
     const estAgents = (props.projectData?.profiles_count || runStatus.value?.profiles_count || 0) || 0
     if (estAgents > 80 || (props.maxRounds && props.maxRounds > 20)) {
-      resourceWarning.value = t('log.highResourceWarning') || '⚠ 高资源需求：建议先用 50 agents / 10 rounds 测试'
+      resourceWarning.value = t('log.highResourceWarning') || '⚠ 高资源需求：建议先用 50 个AI智能体 / 10 rounds 测试'
       addLog(resourceWarning.value)
     }
     

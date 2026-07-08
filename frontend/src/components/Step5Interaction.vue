@@ -72,7 +72,7 @@
             <div class="waiting-ring"></div>
             <div class="waiting-ring"></div>
           </div>
-          <span class="waiting-text">Waiting for Report Agent...</span>
+          <span class="waiting-text">Waiting for Report AI Agent...</span>
         </div>
       </div>
 
@@ -266,7 +266,7 @@
               <div class="message-content">
                 <div class="message-header">
                   <span class="sender-name">
-                    {{ msg.role === 'user' ? 'You' : (chatTarget === 'report_agent' ? 'Report Agent' : (selectedAgent?.username || 'Agent')) }}
+                    {{ msg.role === 'user' ? 'You' : (chatTarget === 'report_agent' ? 'Report AI Agent' : (selectedAgent?.username || 'AI Agent')) }}
                   </span>
                   <span class="message-time">{{ formatTime(msg.timestamp) }}</span>
                 </div>
@@ -852,7 +852,7 @@ const submitSurvey = async () => {
         
         surveyResultsList.push({
           agent_id: agentIdx,
-          agent_name: agent?.username || `Agent ${agentIdx}`,
+          agent_name: agent?.username || `AI Agent ${agentIdx}`,
           profession: agent?.profession,
           question: surveyQuestion.value.trim(),
           answer: responseContent

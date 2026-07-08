@@ -72,7 +72,7 @@
             <div class="waiting-ring"></div>
             <div class="waiting-ring"></div>
           </div>
-          <span class="waiting-text">Waiting for Report Agent...</span>
+          <span class="waiting-text">Waiting for Report AI Agent...</span>
         </div>
       </div>
 
@@ -368,7 +368,7 @@
           <!-- Empty State -->
           <div v-if="agentLogs.length === 0 && !isComplete" class="workflow-empty">
             <div class="empty-pulse"></div>
-            <span>Waiting for agent activity...</span>
+            <span>Waiting for AI Agent activity...</span>
           </div>
         </div>
       </div>
@@ -507,7 +507,7 @@ const toolConfig = {
     icon: 'globe' // 地球图标 - 代表全景搜索
   },
   'interview_agents': {
-    name: 'Agent Interview',
+    name: 'AI Agent Interview',
     color: 'green',
     icon: 'users' // 用户图标 - 代表对话
   },
@@ -1427,7 +1427,7 @@ const InterviewDisplay = {
       // Header Section
       h('div', { class: 'interview-header' }, [
         h('div', { class: 'header-main' }, [
-          h('div', { class: 'header-title' }, 'Agent Interview'),
+          h('div', { class: 'header-title' }, 'AI Agent Interview'),
           h('div', { class: 'header-stats' }, [
             h('span', { class: 'stat-item' }, [
               h('span', { class: 'stat-value' }, props.result.successCount || props.result.interviews.length),
@@ -1453,7 +1453,7 @@ const InterviewDisplay = {
           onClick: () => { activeIndex.value = i }
         }, [
           h('span', { class: 'tab-avatar' }, interview.name ? interview.name.charAt(0) : (i + 1)),
-          h('span', { class: 'tab-name' }, interview.title || interview.name || `Agent ${i + 1}`)
+          h('span', { class: 'tab-name' }, interview.title || interview.name || `AI Agent ${i + 1}`)
         ]))
       ),
       
@@ -1463,7 +1463,7 @@ const InterviewDisplay = {
         h('div', { class: 'agent-profile' }, [
           h('div', { class: 'profile-avatar' }, props.result.interviews[activeIndex.value]?.name?.charAt(0) || 'A'),
           h('div', { class: 'profile-info' }, [
-            h('div', { class: 'profile-name' }, props.result.interviews[activeIndex.value]?.name || 'Agent'),
+            h('div', { class: 'profile-name' }, props.result.interviews[activeIndex.value]?.name || 'AI Agent'),
             h('div', { class: 'profile-role' }, props.result.interviews[activeIndex.value]?.role || ''),
             props.result.interviews[activeIndex.value]?.bio && h('div', { class: 'profile-bio' }, props.result.interviews[activeIndex.value].bio)
           ])
@@ -1504,7 +1504,7 @@ const InterviewDisplay = {
                 h('div', { class: 'qa-badge a-badge' }, `A${qIdx + 1}`),
                 h('div', { class: 'qa-content' }, [
                   h('div', { class: 'qa-answer-header' }, [
-                    h('div', { class: 'qa-sender' }, interview?.name || 'Agent'),
+                    h('div', { class: 'qa-sender' }, interview?.name || 'AI Agent'),
                     // 双平台切换按钮（仅在有真实双平台回答时显示）
                     hasDualPlatform && h('div', { class: 'platform-switch' }, [
                       h('button', {
@@ -2178,7 +2178,7 @@ const stopPolling = () => {
 // Lifecycle
 onMounted(() => {
   if (props.reportId) {
-    addLog(`Report Agent initialized: ${props.reportId}`)
+    addLog(`Report AI Agent initialized: ${props.reportId}`)
     startPolling()
   }
 })
