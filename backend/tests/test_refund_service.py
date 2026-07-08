@@ -337,6 +337,22 @@ def test_admin_granted_subscription_without_stripe_id_is_rejected(app, client, a
 
 
 # ---------------------------------------------------------------------------
+# User with no subscription row at all is rejected with a distinct message
+# ---------------------------------------------------------------------------
+
+def test_user_without_any_subscription_is_rejected(app, client, admin):
+    user_id, _token = _register_user(client, "refund_subject_nosub")
+
+    resp = client.post(
+        f"/api/admin/users/{user_id}/refund",
+        json={"reason": "attempt refund with no subscription"},
+        headers={"Authorization": f"Bearer {admin['token']}"},
+    )
+    assert resp.status_code == 400
+    assert "沒有訂閱紀錄" in resp.get_json()["error"]
+
+
+# ---------------------------------------------------------------------------
 # Double-click via the API: second call after the first finalizes -> 409/400
 # ---------------------------------------------------------------------------
 

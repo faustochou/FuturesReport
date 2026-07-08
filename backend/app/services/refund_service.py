@@ -128,9 +128,11 @@ def refund_user_subscription(
         RefundGatewayError    — the gateway rejected the refund; claim rolled back
     """
     sub = sub_svc.get_user_subscription(user_id)
-    subscription_id = sub.get("stripe_subscription_id") if sub else None
+    if sub is None:
+        raise ValueError("該用戶沒有訂閱紀錄，無法退款")
+    subscription_id = sub.get("stripe_subscription_id")
     if not subscription_id:
-        raise ValueError("此訂閱非經 Stripe 建立，無法線上退款")
+        raise ValueError("此訂閱非經 Stripe 建立（管理員手動開通），無法線上退款")
 
     previous_status = claim_subscription_for_refund(user_id)
     if previous_status is None:
