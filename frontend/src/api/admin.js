@@ -64,6 +64,9 @@ export const updateAdminTier      = (code, data)     => adminService.put(`/api/a
 // User subscription override (admin-granted, no Stripe)
 export const setUserSubscription  = (id, tier_code)  => adminService.put(`/api/admin/users/${id}/subscription`, { tier_code })
 
+// Refund + immediately cancel a user's Stripe subscription
+export const refundUser = (id, reason) => adminService.post(`/api/admin/users/${id}/refund`, { reason })
+
 // Site settings – social links
 export const getAdminSocialLinks   = ()     => adminService.get('/api/admin/settings/social')
 export const updateAdminSocialLinks = (data) => adminService.put('/api/admin/settings/social', data)

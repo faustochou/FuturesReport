@@ -229,6 +229,37 @@ class SimulationRecord(Base):
 
 
 # ---------------------------------------------------------------------------
+# RefundRecord  (audit trail for admin-initiated Stripe refunds)
+# ---------------------------------------------------------------------------
+
+class RefundRecord(Base):
+    """One row per successful admin-initiated refund. Written only after the
+    gateway confirms the refund succeeded (see services/refund_service.py)."""
+    __tablename__ = "refund_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[str] = mapped_column(
+        String(64),
+        ForeignKey("users.user_id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    stripe_subscription_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    stripe_payment_intent_id: Mapped[str] = mapped_column(String(255), nullable=False)
+    stripe_refund_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    # Smallest currency unit (cents), mirrors Stripe's Refund.amount
+    amount: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    currency: Mapped[Optional[str]] = mapped_column(String(10), nullable=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    admin_user_id: Mapped[str] = mapped_column(
+        String(64), ForeignKey("users.user_id"), nullable=False
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+
+# ---------------------------------------------------------------------------
 # SiteSettings  (admin-editable key-value store for global site config)
 # ---------------------------------------------------------------------------
 

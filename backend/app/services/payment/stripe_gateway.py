@@ -85,7 +85,12 @@ class StripeGateway(PaymentGateway):
                 params={"payment_intent": payment_intent_id},
                 options={"idempotency_key": idempotency_key},
             )
-            return RefundResult(success=True, refund_id=refund.id)
+            return RefundResult(
+                success=True,
+                refund_id=refund.id,
+                amount=getattr(refund, "amount", None),
+                currency=getattr(refund, "currency", None),
+            )
         except stripe.StripeError as exc:
             return RefundResult(success=False, error=str(exc))
 
@@ -145,3 +150,15 @@ class StripeGateway(PaymentGateway):
             return None
         ts = getattr(stripe_sub, "current_period_end", None)
         return datetime.utcfromtimestamp(ts) if ts else None
+
+    def get_latest_invoice_payment_intent(
+        self, subscription_id: str
+    ) -> "tuple[Optional[str], Optional[str]]":
+        stripe_sub = self._client.v1.subscriptions.retrieve(subscription_id)
+        invoice_id = getattr(stripe_sub, "latest_invoice", None)
+        if not invoice_id:
+            return None, None
+
+        invoice = self._client.v1.invoices.retrieve(invoice_id)
+        payment_intent_id = getattr(invoice, "payment_intent", None)
+        return payment_intent_id, invoice_id

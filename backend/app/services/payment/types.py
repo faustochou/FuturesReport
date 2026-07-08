@@ -34,6 +34,9 @@ class RefundResult:
     success: bool
     refund_id: Optional[str] = None
     error: Optional[str] = None
+    # Smallest currency unit (cents), populated from the gateway's refund response
+    amount: Optional[int] = None
+    currency: Optional[str] = None
 
 
 @dataclass
@@ -96,4 +99,16 @@ class PaymentGateway(ABC):
         Not part of the shineyang reference interface, but required so that
         subscription_service's webhook handlers never touch the gateway SDK
         directly (see checkout.session.completed handling).
+        """
+
+    @abstractmethod
+    def get_latest_invoice_payment_intent(
+        self, subscription_id: str
+    ) -> "tuple[Optional[str], Optional[str]]":
+        """Resolve subscription -> latest_invoice -> payment_intent.
+
+        Returns (payment_intent_id, invoice_id). Not part of the shineyang
+        reference interface, but required by the admin refund flow (Phase 3)
+        to locate the payment behind a subscription without leaking gateway
+        SDK calls outside this module.
         """

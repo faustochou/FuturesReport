@@ -26,6 +26,11 @@ os.environ["FLASK_DEBUG"] = "False"
 def app():
     import sys
     sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+    # Re-assert (other test modules mutate these same process-global env vars
+    # at import time / fixture-setup time, so the values seen here may have
+    # been overwritten by whichever module ran most recently).
+    os.environ["DATABASE_URL"] = f"sqlite:///{_db_path}"
+    os.environ["SECRET_KEY"] = "test-secret-key-for-smoke-tests"
     from app import create_app
     application = create_app()
     application.config["TESTING"] = True

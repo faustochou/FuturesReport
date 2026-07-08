@@ -10,6 +10,7 @@ from flask import jsonify, request
 from . import admin_bp
 from ..models.user import UserManager
 from ..utils.auth import current_admin, require_admin
+from ..services import refund_service
 from ..services import subscription_service as sub_svc
 
 
@@ -193,6 +194,34 @@ def set_user_subscription(user_id: str):
         "success": True,
         "data": {"user": UserManager.public_user(updated)},
     })
+
+
+@admin_bp.route("/users/<user_id>/refund", methods=["POST"])
+@require_admin
+def refund_user(user_id: str):
+    """Refund the user's most recent Stripe invoice and cancel the subscription
+    immediately. Admin-manually-granted subscriptions (no stripe_subscription_id)
+    are rejected — there is nothing to refund online."""
+    data = request.get_json() or {}
+    reason = (data.get("reason") or "").strip()
+    if not reason:
+        return jsonify({"success": False, "error": "退款原因為必填欄位"}), 400
+
+    admin = current_admin()
+    try:
+        result = refund_service.refund_user_subscription(
+            user_id=user_id,
+            reason=reason,
+            admin_user_id=admin["user_id"],
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    except refund_service.RefundConflictError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 409
+    except refund_service.RefundGatewayError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 502
+
+    return jsonify({"success": True, "data": result})
 
 
 # ---------------------------------------------------------------------------

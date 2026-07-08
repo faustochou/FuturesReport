@@ -246,6 +246,19 @@
               <p class="sub-hint">{{ $t('admin.applyHint') }}</p>
               <p v-if="subMessage" class="success-text">{{ subMessage }}</p>
               <p v-if="subError" class="error-text">{{ subError }}</p>
+
+              <!-- Refund + immediate cancellation (Stripe-backed subscriptions only) -->
+              <div v-if="selectedUser.subscription?.stripe_subscription_id" class="refund-section">
+                <button
+                  class="action-btn delete-btn"
+                  type="button"
+                  :disabled="refundLoading"
+                  @click="confirmRefund"
+                >{{ refundLoading ? $t('admin.refunding') : $t('admin.refundBtn') }}</button>
+                <p class="sub-hint">{{ $t('admin.refundHint') }}</p>
+                <p v-if="refundMessage" class="success-text">{{ refundMessage }}</p>
+                <p v-if="refundError" class="error-text">{{ refundError }}</p>
+              </div>
             </div>
           </template>
 
@@ -496,6 +509,7 @@ import {
   getStripeSettings,
   getVersionHistory,
   listAdminTiers,
+  refundUser,
   setAdminToken,
   setUserSubscription,
   toggleUserActive,
@@ -570,6 +584,11 @@ const subLoading = ref(false)
 const subMessage = ref('')
 const subError   = ref('')
 const subForm    = reactive({ tierCode: '' })
+
+// Refund + immediate cancellation (Stripe-backed subscriptions only)
+const refundLoading = ref(false)
+const refundMessage = ref('')
+const refundError   = ref('')
 
 // Social links
 const SOCIAL_KEYS = ['social_facebook', 'social_x', 'social_instagram', 'social_threads', 'social_github']
@@ -719,6 +738,8 @@ const selectUser = (user) => {
   subForm.tierCode           = user.subscription?.tier_code || ''
   subMessage.value           = ''
   subError.value             = ''
+  refundMessage.value        = ''
+  refundError.value          = ''
 }
 
 const setSubscription = async () => {
@@ -844,6 +865,32 @@ const confirmDelete = async () => {
     error.value = err.message || t('admin.saveFailed')
   } finally {
     loading.value = false
+  }
+}
+
+const confirmRefund = async () => {
+  if (!selectedUser.value) return
+  const reason = prompt(t('admin.confirmRefundPrompt', { username: selectedUser.value.username }))
+  if (reason === null) return
+  const trimmedReason = reason.trim()
+  if (!trimmedReason) {
+    refundError.value = t('admin.refundReasonRequired')
+    return
+  }
+
+  refundLoading.value = true
+  refundMessage.value = ''
+  refundError.value   = ''
+  try {
+    const res = await refundUser(selectedUser.value.user_id, trimmedReason)
+    await loadUsers()
+    refundMessage.value = res.data?.requires_manual_action
+      ? t('admin.refundSuccessManualAction')
+      : t('admin.refundSuccess')
+  } catch (err) {
+    refundError.value = err.message || t('admin.refundFailed')
+  } finally {
+    refundLoading.value = false
   }
 }
 
@@ -1483,6 +1530,14 @@ input, select {
   margin: 0;
   font-size: 11px;
   color: #888;
+}
+
+.refund-section {
+  display: grid;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 10px;
+  border-top: 1px dashed rgba(17, 17, 17, 0.18);
 }
 
 @media (max-width: 860px) {
