@@ -316,26 +316,36 @@
         </div>
       </section>
 
-      <!-- ── Stripe Settings ── -->
+      <!-- ── Payment Gateway Settings ── -->
       <section v-if="activeTab === 'stripe'" class="settings-panel">
         <div class="section-title">
           <div>
             <p class="eyebrow">{{ $t('admin.paymentGateway') }}</p>
             <h2>{{ $t('admin.stripeTitle') }}</h2>
           </div>
-          <button class="icon-btn" type="button" @click="loadStripeSettings">↻</button>
+          <button class="icon-btn" type="button" @click="loadPaymentSettings">↻</button>
         </div>
 
-        <div v-if="stripeSettings" class="settings-grid">
-          <!-- Status row -->
+        <div v-if="paymentSettings" class="settings-grid">
+          <!-- Gateway selector -->
+          <div class="setting-card">
+            <p class="setting-label">{{ $t('admin.gatewayLabel') }}</p>
+            <select v-model="paymentForm.gateway">
+              <option value="stripe">Stripe</option>
+              <option value="payuni" disabled>PayUni（{{ $t('admin.comingSoon') }}）</option>
+              <option value="shopline" disabled>Shopline（{{ $t('admin.comingSoon') }}）</option>
+            </select>
+          </div>
+
+          <!-- Status -->
           <div class="setting-card">
             <p class="setting-label">{{ $t('admin.stripeStatus') }}</p>
             <p class="setting-value">
-              <span class="pill" :class="stripeSettings.is_configured ? 'ready' : ''">
-                {{ stripeSettings.is_configured ? $t('admin.configured') : $t('admin.notConfigured') }}
+              <span class="pill" :class="paymentSettings.stripe.secret_key.configured ? 'ready' : ''">
+                {{ paymentSettings.stripe.secret_key.configured ? $t('admin.configured') : $t('admin.notConfigured') }}
               </span>
-              <span v-if="stripeSettings.is_configured" class="pill mode-pill">
-                {{ stripeSettings.is_test_mode ? $t('admin.testMode') : $t('admin.liveMode') }}
+              <span v-if="paymentSettings.stripe.secret_key.configured" class="pill mode-pill">
+                {{ paymentSettings.is_test_mode ? $t('admin.testMode') : $t('admin.liveMode') }}
               </span>
             </p>
           </div>
@@ -343,46 +353,88 @@
           <!-- Secret key -->
           <div class="setting-card">
             <p class="setting-label">Secret Key</p>
-            <p class="setting-value mono">
-              {{ stripeSettings.secret_key_hint || $t('admin.notSet') }}
-              <span class="hint-note">{{ $t('admin.keyHint') }}</span>
-            </p>
+            <input
+              v-model.trim="paymentForm.stripe_secret_key"
+              type="password"
+              autocomplete="off"
+              class="setting-input"
+              :placeholder="keyPlaceholder(paymentSettings.stripe.secret_key)"
+            />
+            <p class="hint-note">{{ $t('admin.keyHint') }}</p>
+            <button
+              v-if="paymentSettings.stripe.secret_key.configured"
+              class="link-btn"
+              type="button"
+              @click="clearPaymentField('stripe_secret_key')"
+            >{{ $t('admin.clearKey') }}</button>
+          </div>
+
+          <!-- Webhook secret -->
+          <div class="setting-card">
+            <p class="setting-label">{{ $t('admin.webhookSecret') }}</p>
+            <input
+              v-model.trim="paymentForm.stripe_webhook_secret"
+              type="password"
+              autocomplete="off"
+              class="setting-input"
+              :placeholder="keyPlaceholder(paymentSettings.stripe.webhook_secret)"
+            />
+            <button
+              v-if="paymentSettings.stripe.webhook_secret.configured"
+              class="link-btn"
+              type="button"
+              @click="clearPaymentField('stripe_webhook_secret')"
+            >{{ $t('admin.clearKey') }}</button>
           </div>
 
           <!-- Publishable key -->
           <div class="setting-card">
             <p class="setting-label">Publishable Key</p>
-            <p class="setting-value mono">{{ stripeSettings.publishable_key_hint || $t('admin.notSet') }}</p>
+            <input
+              v-model.trim="paymentForm.stripe_publishable_key"
+              type="text"
+              autocomplete="off"
+              class="setting-input"
+              :placeholder="keyPlaceholder(paymentSettings.stripe.publishable_key)"
+            />
+            <button
+              v-if="paymentSettings.stripe.publishable_key.configured"
+              class="link-btn"
+              type="button"
+              @click="clearPaymentField('stripe_publishable_key')"
+            >{{ $t('admin.clearKey') }}</button>
+          </div>
+
+          <!-- Save + test connection -->
+          <div class="setting-card actions-card">
+            <p class="setting-label">{{ $t('admin.actionsLabel') }}</p>
+            <div class="inline-row">
+              <button class="action-btn" type="button" :disabled="paymentSaving" @click="savePaymentSettings">
+                {{ paymentSaving ? $t('admin.saving') : $t('admin.paymentSaveBtn') }}
+              </button>
+              <button class="action-btn" type="button" :disabled="testConnLoading" @click="runTestConnection">
+                {{ testConnLoading ? $t('admin.testingConnection') : $t('admin.testConnectionBtn') }}
+              </button>
+            </div>
+            <p v-if="testConnResult" :class="testConnResult.success ? 'success-text' : 'error-text'">
+              {{ testConnResult.message }}
+            </p>
           </div>
 
           <!-- Webhook -->
           <div class="setting-card webhook-card">
             <p class="setting-label">{{ $t('admin.webhookUrl') }}</p>
             <div class="webhook-row">
-              <code class="webhook-url">{{ stripeSettings.webhook_url }}</code>
+              <code class="webhook-url">{{ paymentSettings.webhook_url }}</code>
               <button class="icon-btn copy-btn" type="button" @click="copyWebhookUrl" title="Copy">⎘</button>
             </div>
             <p class="hint-note">{{ $t('admin.webhookPasteHint') }}</p>
             <p class="hint-note">{{ $t('admin.webhookEventsHint') }}</p>
-            <p class="setting-value">
-              <span class="pill" :class="stripeSettings.webhook_configured ? 'ready' : ''">
-                {{ $t('admin.webhookSecret') }} {{ stripeSettings.webhook_configured ? $t('admin.configured') : $t('admin.notConfigured') }}
-              </span>
-            </p>
-          </div>
-
-          <!-- Env var instructions -->
-          <div class="setting-card env-card">
-            <p class="setting-label">{{ $t('admin.envVarsTitle') }}</p>
-            <pre class="env-block">STRIPE_SECRET_KEY=sk_test_...
-STRIPE_PUBLISHABLE_KEY=pk_test_...
-STRIPE_WEBHOOK_SECRET=whsec_...
-STRIPE_PRICE_ID_LITE=price_...</pre>
-            <p class="hint-note">{{ $t('admin.stripeKeyHint') }}</p>
           </div>
         </div>
         <p v-else class="muted">{{ $t('admin.loadingText') }}</p>
-        <p v-if="stripeError" class="error-text">{{ stripeError }}</p>
+        <p v-if="paymentMessage" class="success-text">{{ paymentMessage }}</p>
+        <p v-if="paymentError" class="error-text">{{ paymentError }}</p>
       </section>
 
       <!-- ── Subscription Tiers ── -->
@@ -506,16 +558,18 @@ import {
   getAdminUsers,
   getAdminSocialLinks,
   getDashboard,
-  getStripeSettings,
+  getPaymentSettings,
   getVersionHistory,
   listAdminTiers,
   refundUser,
   setAdminToken,
   setUserSubscription,
+  testPaymentConnection,
   toggleUserActive,
   updateAdminSocialLinks,
   updateAdminTier,
   updateAdminUser,
+  updatePaymentSettings,
 } from '../api/admin'
 import DEFAULT_PROVIDERS from '../config/providers'
 
@@ -568,9 +622,19 @@ const filteredUsers   = computed(() => {
   })
 })
 
-// Stripe settings
-const stripeSettings = ref(null)
-const stripeError    = ref('')
+// Payment gateway settings
+const paymentSettings = ref(null)
+const paymentError    = ref('')
+const paymentMessage  = ref('')
+const paymentSaving   = ref(false)
+const paymentForm     = reactive({
+  gateway: 'stripe',
+  stripe_secret_key: '',
+  stripe_webhook_secret: '',
+  stripe_publishable_key: '',
+})
+const testConnLoading = ref(false)
+const testConnResult  = ref(null)   // { success, message }
 
 // Tier management
 const tiers       = ref([])
@@ -602,7 +666,7 @@ const socialError   = ref('')
 watch(activeTab, (tab) => {
   if (tab === 'dashboard') loadDashboard()
   if (tab === 'users')     { loadUsers(); loadTiers() }
-  if (tab === 'stripe')    loadStripeSettings()
+  if (tab === 'stripe')    loadPaymentSettings()
   if (tab === 'tiers')     loadTiers()
   if (tab === 'versions')  loadVersions()
   if (tab === 'social')    loadSocialLinks()
@@ -894,20 +958,86 @@ const confirmRefund = async () => {
   }
 }
 
-// ── Stripe Settings ──────────────────────────────────────────────────────────
+// ── Payment Gateway Settings ─────────────────────────────────────────────────
 
-const loadStripeSettings = async () => {
-  stripeError.value = ''
+const keyPlaceholder = (entry) => {
+  if (!entry) return ''
+  if (!entry.configured) return t('admin.notSet')
+  const sourceLabel = entry.source === 'db' ? t('admin.sourceDb') : t('admin.sourceEnv')
+  return `${entry.hint} (${sourceLabel})`
+}
+
+const loadPaymentSettings = async () => {
+  paymentError.value = ''
   try {
-    const res = await getStripeSettings()
-    stripeSettings.value = res.data?.stripe || null
+    const res = await getPaymentSettings()
+    paymentSettings.value = res.data
+    paymentForm.gateway = res.data.gateway
+    paymentForm.stripe_secret_key      = ''
+    paymentForm.stripe_webhook_secret  = ''
+    paymentForm.stripe_publishable_key = ''
+    testConnResult.value = null
   } catch (err) {
-    stripeError.value = err.message || t('admin.loadStripeFailed')
+    paymentError.value = err.message || t('admin.loadPaymentFailed')
+  }
+}
+
+const savePaymentSettings = async () => {
+  paymentSaving.value = true
+  paymentError.value   = ''
+  paymentMessage.value = ''
+  try {
+    const payload = {}
+    if (paymentForm.gateway !== paymentSettings.value?.gateway) payload.gateway = paymentForm.gateway
+    if (paymentForm.stripe_secret_key)      payload.stripe_secret_key      = paymentForm.stripe_secret_key
+    if (paymentForm.stripe_webhook_secret)  payload.stripe_webhook_secret  = paymentForm.stripe_webhook_secret
+    if (paymentForm.stripe_publishable_key) payload.stripe_publishable_key = paymentForm.stripe_publishable_key
+
+    if (Object.keys(payload).length === 0) {
+      paymentMessage.value = t('admin.noPaymentChanges')
+      return
+    }
+    await updatePaymentSettings(payload)
+    paymentMessage.value = t('admin.paymentSaved')
+    await loadPaymentSettings()
+  } catch (err) {
+    paymentError.value = err.message || t('admin.saveFailed')
+  } finally {
+    paymentSaving.value = false
+  }
+}
+
+const clearPaymentField = async (fieldKey) => {
+  paymentSaving.value = true
+  paymentError.value   = ''
+  paymentMessage.value = ''
+  try {
+    await updatePaymentSettings({ [fieldKey]: '' })
+    paymentMessage.value = t('admin.paymentCleared')
+    await loadPaymentSettings()
+  } catch (err) {
+    paymentError.value = err.message || t('admin.saveFailed')
+  } finally {
+    paymentSaving.value = false
+  }
+}
+
+const runTestConnection = async () => {
+  testConnLoading.value = true
+  testConnResult.value  = null
+  paymentError.value    = ''
+  try {
+    const res = await testPaymentConnection()
+    testConnResult.value = res.data
+  } catch (err) {
+    paymentError.value = err.message || t('admin.testConnectionFailed')
+  } finally {
+    testConnLoading.value = false
   }
 }
 
 const copyWebhookUrl = () => {
-  const url = stripeSettings.value?.webhook_url
+  const url = paymentSettings.value?.webhook_url
   if (!url) return
   navigator.clipboard.writeText(url).catch(() => {})
 }
@@ -1404,6 +1534,24 @@ input, select {
   color: #1e40af;
   background: #eff6ff;
 }
+
+.link-btn {
+  margin-top: 6px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 700;
+  color: #888;
+  text-decoration: underline;
+  cursor: pointer;
+  align-self: flex-start;
+}
+.link-btn:hover { color: #111; }
+
+.actions-card { grid-column: 1 / -1; }
+.actions-card .inline-row { margin-bottom: 8px; }
 
 /* ── Tier Management ── */
 .tier-list {

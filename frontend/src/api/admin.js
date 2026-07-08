@@ -25,7 +25,13 @@ adminService.interceptors.response.use(
     }
     return res
   },
-  error => Promise.reject(error)
+  error => {
+    // Non-2xx responses skip the success handler above, so extract the
+    // backend's error message here too (mirrors src/api/index.js).
+    const serverMessage = error.response?.data?.error || error.response?.data?.message
+    if (serverMessage) return Promise.reject(new Error(serverMessage))
+    return Promise.reject(error)
+  }
 )
 
 export const getAdminToken       = () => localStorage.getItem(ADMIN_TOKEN_KEY) || ''
@@ -54,8 +60,13 @@ export const deleteUser       = (id)            => adminService.delete(`/api/adm
 // Version history
 export const getVersionHistory = () => adminService.get('/api/admin/versions')
 
-// Stripe settings (read-only)
+// Stripe settings (read-only; superseded by the payment settings API below)
 export const getStripeSettings = () => adminService.get('/api/admin/stripe/settings')
+
+// Payment gateway settings (gateway-agnostic; Stripe implemented today)
+export const getPaymentSettings     = ()     => adminService.get('/api/admin/payment/settings')
+export const updatePaymentSettings  = (data) => adminService.put('/api/admin/payment/settings', data)
+export const testPaymentConnection  = ()     => adminService.post('/api/admin/payment/test-connection')
 
 // Subscription tier management
 export const listAdminTiers       = ()               => adminService.get('/api/admin/subscription/tiers')

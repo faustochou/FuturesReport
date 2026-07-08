@@ -10,8 +10,10 @@ from flask import jsonify, request
 from . import admin_bp
 from ..models.user import UserManager
 from ..utils.auth import current_admin, require_admin
+from ..services import payment_settings_service as pay_settings
 from ..services import refund_service
 from ..services import subscription_service as sub_svc
+from ..services.payment import factory as payment_factory
 
 
 def _version_history_path() -> str:
@@ -31,6 +33,17 @@ def _runtime_commit() -> str:
         if value:
             return value[:7]
     return "current deployment"
+
+
+def _webhook_url() -> str:
+    # Build from SITE_URL env var (required behind Zeabur reverse proxy, because
+    # request.host_url returns the internal container address, not the public domain).
+    site_url = os.environ.get("SITE_URL", "").strip().rstrip("/")
+    if not site_url:
+        proto = request.headers.get("X-Forwarded-Proto", request.scheme)
+        host  = request.headers.get("X-Forwarded-Host", request.host)
+        site_url = f"{proto}://{host}"
+    return f"{site_url}/api/subscription/webhook"
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +259,8 @@ def version_history():
 
 
 # ---------------------------------------------------------------------------
-# Stripe settings (read-only for now; keys are managed via env vars)
+# Stripe settings — kept for backward compatibility; superseded by the
+# gateway-agnostic /payment/settings endpoints below.
 # ---------------------------------------------------------------------------
 
 @admin_bp.route("/stripe/settings", methods=["GET"])
@@ -254,15 +268,81 @@ def version_history():
 def stripe_settings():
     """Return a safe summary of Stripe configuration status."""
     summary = sub_svc.get_stripe_settings_summary()
-    # Build webhook URL from SITE_URL env var (required behind Zeabur reverse proxy,
-    # because request.host_url returns the internal container address, not the public domain).
-    site_url = os.environ.get("SITE_URL", "").strip().rstrip("/")
-    if not site_url:
-        proto = request.headers.get("X-Forwarded-Proto", request.scheme)
-        host  = request.headers.get("X-Forwarded-Host", request.host)
-        site_url = f"{proto}://{host}"
-    summary["webhook_url"] = f"{site_url}/api/subscription/webhook"
+    summary["webhook_url"] = _webhook_url()
     return jsonify({"success": True, "data": {"stripe": summary}})
+
+
+# ---------------------------------------------------------------------------
+# Payment gateway settings (gateway-agnostic; Stripe implemented today)
+# ---------------------------------------------------------------------------
+
+# Gateway ids the dropdown may offer. Only "stripe" can actually be selected —
+# the others are reserved (interface exists, "coming soon" in the UI).
+_KNOWN_GATEWAYS = {"stripe", "payuni", "shopline"}
+_SELECTABLE_GATEWAYS = {"stripe"}
+
+
+@admin_bp.route("/payment/settings", methods=["GET"])
+@require_admin
+def get_payment_settings():
+    """Active gateway + masked key hints (with effective source: db/env) for the admin UI."""
+    snapshot = pay_settings.get_effective_settings()
+    secret_key = pay_settings.get_stripe_secret_key() or ""
+
+    return jsonify({
+        "success": True,
+        "data": {
+            "gateway": pay_settings.get_active_gateway_type(),
+            "stripe": {
+                "secret_key":      snapshot[pay_settings.STRIPE_SECRET_KEY],
+                "webhook_secret":  snapshot[pay_settings.STRIPE_WEBHOOK_SECRET],
+                "publishable_key": snapshot[pay_settings.STRIPE_PUBLISHABLE_KEY],
+            },
+            "is_test_mode": secret_key.startswith("sk_test_"),
+            "webhook_url": _webhook_url(),
+        },
+    })
+
+
+@admin_bp.route("/payment/settings", methods=["PUT"])
+@require_admin
+def update_payment_settings():
+    """Update the active gateway and/or Stripe keys. An empty string clears the
+    DB override for that field (falls back to env). Values are never echoed back."""
+    data = request.get_json() or {}
+
+    if "gateway" in data:
+        gateway = (data["gateway"] or "").strip().lower()
+        if gateway and gateway not in _SELECTABLE_GATEWAYS:
+            if gateway in _KNOWN_GATEWAYS:
+                return jsonify({
+                    "success": False,
+                    "error": f"金流閘道「{gateway}」尚未支援，敬請期待。",
+                }), 400
+            return jsonify({"success": False, "error": f"未知的金流閘道：{gateway}"}), 400
+        pay_settings.set_setting(pay_settings.GATEWAY, gateway or None)
+
+    if "stripe_secret_key" in data:
+        pay_settings.set_setting(pay_settings.STRIPE_SECRET_KEY, data["stripe_secret_key"])
+    if "stripe_webhook_secret" in data:
+        pay_settings.set_setting(pay_settings.STRIPE_WEBHOOK_SECRET, data["stripe_webhook_secret"])
+    if "stripe_publishable_key" in data:
+        pay_settings.set_setting(pay_settings.STRIPE_PUBLISHABLE_KEY, data["stripe_publishable_key"])
+
+    return jsonify({"success": True, "data": {}})
+
+
+@admin_bp.route("/payment/test-connection", methods=["POST"])
+@require_admin
+def test_payment_connection():
+    """Verify the active gateway's configured credentials actually work."""
+    try:
+        gateway = payment_factory.get_active_gateway()
+    except RuntimeError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+
+    success, message = gateway.test_connection()
+    return jsonify({"success": True, "data": {"success": success, "message": message}})
 
 
 # ---------------------------------------------------------------------------
