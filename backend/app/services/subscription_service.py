@@ -1,40 +1,30 @@
 """
-Stripe subscription service.
+Subscription service — pure DB logic (tier CRUD, subscription upsert,
+feature checks) plus thin orchestration around the pluggable payment
+gateway (see ..payment.factory / ..payment.types).
 
-All Stripe API calls go through this module.  The service is intentionally
-stateless: no caching of tier data so admin toggles take effect immediately.
-
-stripe SDK >= 10.0: uses StripeClient.v1.* for API calls,
-and the module-level stripe.Webhook.construct_event() for webhook verification.
+No Stripe SDK calls live in this module — they all live in
+payment/stripe_gateway.py. This module only ever talks to a PaymentGateway
+instance obtained from payment.factory.
 """
 
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import stripe
-
 from ..db.database import get_db
 from ..db.models import SubscriptionTier, UserSubscription
 from ..utils.logger import get_logger
 from . import payment_settings_service as pay_settings
+from .payment import factory as payment_factory
+from .payment.types import CheckoutSessionParams, PortalSessionParams
 from sqlalchemy import select
 
 logger = get_logger("futuresreport.subscription")
 
 
 # ---------------------------------------------------------------------------
-# Stripe client initialisation
+# Stripe configuration status (delegates to payment_settings_service)
 # ---------------------------------------------------------------------------
-
-def _get_stripe_client() -> stripe.StripeClient:
-    """Lazy-initialise Stripe client.  Raises RuntimeError if key is missing."""
-    secret_key = pay_settings.get_stripe_secret_key()
-    if not secret_key:
-        raise RuntimeError(
-            "STRIPE_SECRET_KEY 未設定。請在後台「金流設定」或 .env / Zeabur 環境變數中填入。"
-        )
-    return stripe.StripeClient(secret_key)
-
 
 def is_stripe_configured() -> bool:
     """Return True only when both the secret key and webhook secret are set."""
@@ -212,7 +202,7 @@ def check_feature(user_id: str, feature_key: str) -> bool:
 
 
 # ---------------------------------------------------------------------------
-# Stripe Checkout Session
+# Checkout Session
 # ---------------------------------------------------------------------------
 
 def create_checkout_session(
@@ -223,7 +213,7 @@ def create_checkout_session(
     success_url: str,
     cancel_url: str,
 ) -> str:
-    """Create a Stripe Checkout Session and return the checkout URL."""
+    """Create a checkout session with the active gateway and return its URL."""
     tier = get_tier(tier_code)
     if tier is None:
         raise ValueError(f"未知方案：{tier_code}")
@@ -239,19 +229,17 @@ def create_checkout_session(
             "請先在後台管理系統填入。"
         )
 
-    client = _get_stripe_client()
-    session = client.v1.checkout.sessions.create(
-        params={
-            "mode": "subscription",
-            "payment_method_types": ["card"],
-            "line_items": [{"price": price_id, "quantity": 1}],
-            "customer_email": user_email or None,
-            "metadata": {"user_id": user_id, "tier_code": tier_code},
-            "success_url": success_url,
-            "cancel_url": cancel_url,
-        }
+    gateway = payment_factory.get_active_gateway()
+    return gateway.create_checkout_session(
+        CheckoutSessionParams(
+            user_id=user_id,
+            user_email=user_email,
+            tier_code=tier_code,
+            price_id=price_id,
+            success_url=success_url,
+            cancel_url=cancel_url,
+        )
     )
-    return session.url
 
 
 # ---------------------------------------------------------------------------
@@ -259,19 +247,18 @@ def create_checkout_session(
 # ---------------------------------------------------------------------------
 
 def create_portal_session(*, user_id: str, return_url: str) -> str:
-    """Create a Stripe Customer Portal session URL."""
+    """Create a billing-portal session with the active gateway and return its URL."""
     sub = get_user_subscription(user_id)
     if not sub or not sub.get("stripe_customer_id"):
         raise ValueError("找不到有效的 Stripe 客戶資料，請先完成訂閱。")
 
-    client = _get_stripe_client()
-    portal = client.v1.billing_portal.sessions.create(
-        params={
-            "customer": sub["stripe_customer_id"],
-            "return_url": return_url,
-        }
+    gateway = payment_factory.get_active_gateway()
+    return gateway.create_portal_session(
+        PortalSessionParams(
+            customer_id=sub["stripe_customer_id"],
+            return_url=return_url,
+        )
     )
-    return portal.url
 
 
 # ---------------------------------------------------------------------------
@@ -279,16 +266,12 @@ def create_portal_session(*, user_id: str, return_url: str) -> str:
 # ---------------------------------------------------------------------------
 
 def construct_webhook_event(payload: bytes, sig_header: str) -> Any:
-    """Verify Stripe-Signature header and return the parsed Event.
+    """Verify the inbound webhook signature and return the parsed event.
 
-    Uses the module-level stripe.Webhook (not StripeClient) as required
-    by the Stripe Python SDK.  payload must be the raw request bytes —
-    never pass a decoded/re-serialised body.
+    payload must be the raw request bytes — never pass a decoded/re-serialised body.
     """
-    webhook_secret = pay_settings.get_stripe_webhook_secret()
-    if not webhook_secret:
-        raise RuntimeError("STRIPE_WEBHOOK_SECRET 未設定")
-    return stripe.Webhook.construct_event(payload, sig_header, webhook_secret)
+    gateway = payment_factory.get_active_gateway()
+    return gateway.construct_webhook_event(payload, sig_header)
 
 
 # ---------------------------------------------------------------------------
@@ -314,11 +297,8 @@ def handle_checkout_completed(event_data: Dict[str, Any]) -> None:
     period_end = None
     if subscription_id:
         try:
-            client = _get_stripe_client()
-            stripe_sub = client.v1.subscriptions.retrieve(subscription_id)
-            ts = getattr(stripe_sub, "current_period_end", None)
-            if ts:
-                period_end = datetime.utcfromtimestamp(ts)
+            gateway = payment_factory.get_active_gateway()
+            period_end = gateway.get_subscription_period_end(subscription_id)
         except Exception as exc:
             logger.warning("[Webhook] 無法取得訂閱期限: %s", exc)
 
