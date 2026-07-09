@@ -8,6 +8,8 @@ import InteractionView from '../views/InteractionView.vue'
 import AdminView from '../views/AdminView.vue'
 import SubscriptionView from '../views/SubscriptionView.vue'
 import SimulateLaunchView from '../views/SimulateLaunchView.vue'
+import PrivacyPolicyView from '../views/PrivacyPolicyView.vue'
+import FreeApplicationView from '../views/FreeApplicationView.vue'
 import { authState } from '../store/auth'
 
 const routes = [
@@ -61,6 +63,16 @@ const routes = [
     path: '/admin',
     name: 'Admin',
     component: AdminView
+  },
+  {
+    path: '/privacy-policy',
+    name: 'PrivacyPolicy',
+    component: PrivacyPolicyView
+  },
+  {
+    path: '/free-application',
+    name: 'FreeApplication',
+    component: FreeApplicationView
   }
 ]
 
