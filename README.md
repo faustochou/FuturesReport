@@ -175,6 +175,18 @@ Reads `.env` from root directory by default, maps ports `3000 (frontend) / 5001 
 
 > Mirror address for faster pulling is provided as comments in `docker-compose.yml`, replace if needed.
 
+### Option 3: Zeabur Deployment
+
+Zeabur's container filesystem is **ephemeral** — every redeploy wipes the container's local disk. FuturesReport stores project files, simulation data, and reports under `backend/uploads/` by default, so without a persistent volume, a redeploy will delete that folder while database records (simulation history, reports) survive, leaving orphaned references like "Project not found: proj_xxx" when opening old simulation records.
+
+To avoid this, configure persistent storage before deploying on Zeabur:
+
+1. On your backend service, add a **Volume** (persistent volume) and mount it into the container, e.g. mount path `/data/uploads`.
+2. Set the environment variable `UPLOAD_FOLDER=/data/uploads` on the backend service, so all project/simulation/report files are written to the mounted volume instead of the ephemeral container disk.
+3. (Optional but recommended) Also point `USER_DATA_DIR` at a path under the same volume (e.g. `/data`) if you rely on the SQLite fallback instead of `DATABASE_URL`, so the database file persists across redeploys too.
+
+Without this volume + `UPLOAD_FOLDER` configuration, project/simulation/report files will be lost on every redeploy even though database records remain — this is a known limitation of ephemeral container storage, not a bug in the application logic.
+
 ## 📄 Acknowledgments
 
 FuturesReport's simulation engine is powered by **[OASIS (Open Agent Social Interaction Simulations)](https://github.com/camel-ai/oasis)**. We sincerely thank the CAMEL-AI team for their open-source contributions!

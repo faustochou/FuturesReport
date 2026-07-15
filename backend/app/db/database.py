@@ -13,6 +13,8 @@ from typing import Generator
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
+from ..config import Config
+
 
 class Base(DeclarativeBase):
     pass
@@ -30,10 +32,11 @@ def _resolve_database_url() -> str:
             url = url.replace("postgres://", "postgresql://", 1)
         return url
 
-    # Default: SQLite file alongside users.json
-    data_dir = os.environ.get("USER_DATA_DIR", "").strip()
-    if not data_dir:
-        data_dir = os.path.join(os.path.dirname(__file__), "../../../uploads")
+    # Default: SQLite file alongside users.json.
+    # Config.DATA_FOLDER already resolves USER_DATA_DIR -> UPLOAD_FOLDER, so this
+    # stays in sync with the single UPLOAD_FOLDER-derived path logic instead of
+    # duplicating it here.
+    data_dir = Config.DATA_FOLDER
     os.makedirs(data_dir, exist_ok=True)
     return f"sqlite:///{os.path.join(data_dir, 'futuresreport.db')}"
 

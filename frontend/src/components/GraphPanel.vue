@@ -206,6 +206,12 @@
         <p>{{ $t('graph.graphDataLoading') }}</p>
       </div>
       
+      <!-- 原始专案已遗失 -->
+      <div v-else-if="projectMissing" class="graph-state">
+        <div class="empty-icon">⚠</div>
+        <p class="empty-text">{{ $t('process.projectMissingTitle') }}</p>
+      </div>
+
       <!-- 等待/空状态 -->
       <div v-else class="graph-state">
         <div class="empty-icon">❖</div>
@@ -243,7 +249,8 @@ const props = defineProps({
   graphData: Object,
   loading: Boolean,
   currentPhase: Number,
-  isSimulating: Boolean
+  isSimulating: Boolean,
+  projectMissing: Boolean
 })
 
 const emit = defineEmits(['refresh', 'toggle-maximize'])

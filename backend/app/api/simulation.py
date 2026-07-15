@@ -10,6 +10,7 @@ import sqlite3
 import threading
 import traceback
 from datetime import datetime
+from typing import Optional
 from flask import request, jsonify, send_file
 
 from . import simulation_bp
@@ -18,6 +19,7 @@ from ..services.zep_entity_reader import ZepEntityReader
 from ..services.oasis_profile_generator import OasisProfileGenerator
 from ..services.simulation_manager import SimulationManager, SimulationStatus
 from ..services.simulation_runner import SimulationRunner, RunnerStatus
+from ..services.report_agent import ReportManager
 from ..utils.auth import current_user, get_current_llm_config, require_auth, require_llm_config
 from ..utils.logger import get_logger
 from ..utils.locale import t, get_locale, set_locale
@@ -844,9 +846,8 @@ def _get_report_id_for_simulation(simulation_id: str) -> str:
     Returns:
         report_id 或 None
     """
-    # reports 目录路径：backend/uploads/reports
-    # __file__ 是 app/api/simulation.py，需要向上两级到 backend/
-    reports_dir = os.path.join(os.path.dirname(__file__), '../../uploads/reports')
+    # reports 目录路径，与 ReportManager 保持同一套 UPLOAD_FOLDER 推导逻辑
+    reports_dir = ReportManager.REPORTS_DIR
     if not os.path.exists(reports_dir):
         return None
     
@@ -2061,10 +2062,7 @@ def get_simulation_posts(simulation_id: str):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        sim_dir = os.path.join(
-            os.path.dirname(__file__),
-            f'../../uploads/simulations/{simulation_id}'
-        )
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
         
         db_file = f"{platform}_simulation.db"
         db_path = os.path.join(sim_dir, db_file)
@@ -2136,10 +2134,7 @@ def get_simulation_comments(simulation_id: str):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        sim_dir = os.path.join(
-            os.path.dirname(__file__),
-            f'../../uploads/simulations/{simulation_id}'
-        )
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
         
         db_path = os.path.join(sim_dir, "reddit_simulation.db")
         
@@ -2825,6 +2820,13 @@ def _finalize_simulation_record(simulation_id: str, status: str, completed_at=No
             record.completed_at = completed_at or datetime.utcnow()
 
 
+def _project_exists(project_id: Optional[str]) -> bool:
+    """記錄沒有 project_id，或其原始專案目錄已不存在（例如 ephemeral 容器 redeploy 後被清空）時回傳 False"""
+    if not project_id:
+        return False
+    return ProjectManager.get_project(project_id) is not None
+
+
 @simulation_bp.route('/records', methods=['GET'])
 @require_auth
 def list_simulation_records():
@@ -2873,6 +2875,7 @@ def list_simulation_records():
                     "id": r.id,
                     "simulation_id": r.simulation_id,
                     "project_id": r.project_id,
+                    "project_exists": _project_exists(r.project_id),
                     "title": r.title,
                     "report_filenames": filenames,
                     "started_at": r.started_at.isoformat() if r.started_at else None,
@@ -2926,6 +2929,7 @@ def get_simulation_record(record_id: int):
                     "id": record.id,
                     "simulation_id": record.simulation_id,
                     "project_id": record.project_id,
+                    "project_exists": _project_exists(record.project_id),
                     "title": record.title,
                     "report_filenames": filenames,
                     "started_at": record.started_at.isoformat() if record.started_at else None,

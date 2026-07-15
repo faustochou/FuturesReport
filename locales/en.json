@@ -358,7 +358,12 @@
     "statusCompleted": "Completed",
     "statusRunning": "Running",
     "statusFailed": "Aborted",
-    "retentionNotice": "Records retained for 30 days"
+    "retentionNotice": "Records retained for 30 days",
+    "projectLostBadge": "Original project lost"
+  },
+  "process": {
+    "projectMissingTitle": "Original Project Data Unavailable",
+    "projectMissingDesc": "The original project data for this simulation no longer exists, likely lost due to a service redeployment. Graph building is unavailable, but completed simulation results and reports are not affected."
   },
   "subscription": {
     "plans": "Subscription Plans",

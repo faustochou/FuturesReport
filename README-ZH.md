@@ -175,6 +175,18 @@ docker compose up -d
 
 > 在 `docker-compose.yml` 中已通过注释提供加速镜像地址，可按需替换
 
+### 三、Zeabur 部署
+
+Zeabur 的容器文件系统是**临时的（ephemeral）**：每次重新部署都会清空容器本地磁盘。FuturesReport 默认将项目文件、模拟数据、报告存放在 `backend/uploads/` 目录下，如果没有配置持久化卷，重新部署会把该目录整个清空，而数据库中的记录（模拟历史、报告）不受影响，于是打开旧的模拟记录时会出现"专案不存在：proj_xxx"这类孤儿引用错误。
+
+为避免这个问题，请在 Zeabur 上部署前配置持久化存储：
+
+1. 在后端服务上新增一个 **Volume（持久化卷）**，挂载到容器内，例如挂载路径 `/data/uploads`。
+2. 在后端服务上设置环境变量 `UPLOAD_FOLDER=/data/uploads`，让所有项目/模拟/报告文件都写入挂载的持久化卷，而不是临时的容器磁盘。
+3. （可选但建议）如果你使用 SQLite 回退方案而非 `DATABASE_URL`，也请将 `USER_DATA_DIR` 指向同一持久化卷下的路径（例如 `/data`），使数据库文件同样能在重新部署后保留。
+
+如果没有配置持久化卷与 `UPLOAD_FOLDER`，即使数据库记录仍然存在，项目/模拟/报告文件也会在每次重新部署后丢失——这是容器临时存储的已知限制，并非应用逻辑的缺陷。
+
 ## 📄 致谢
 
 FuturesReport 的仿真引擎由 **[OASIS](https://github.com/camel-ai/oasis)** 驱动，我们衷心感谢 CAMEL-AI 团队的开源贡献！

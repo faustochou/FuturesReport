@@ -1,6 +1,16 @@
 <template>
   <div class="workbench-panel">
-    <div class="scroll-container">
+    <!-- 原始专案已遗失：空状态卡片，停用所有依赖专案的操作 -->
+    <div v-if="projectMissing" class="scroll-container">
+      <div class="project-missing-card">
+        <div class="missing-icon">⚠</div>
+        <h3 class="missing-title">{{ $t('process.projectMissingTitle') }}</h3>
+        <p class="missing-desc">{{ $t('process.projectMissingDesc') }}</p>
+        <button class="missing-back-btn" @click="router.push('/launch')">{{ $t('common.back') }}</button>
+      </div>
+    </div>
+
+    <div v-else class="scroll-container">
       <!-- Step 01: Ontology -->
       <div class="step-card" :class="{ 'active': currentPhase === 0, 'completed': currentPhase > 0 }">
         <div class="card-header">
@@ -208,7 +218,8 @@ const props = defineProps({
   buildProgress: Object,
   graphData: Object,
   systemLogs: { type: Array, default: () => [] },
-  error: { type: String, default: '' }
+  error: { type: String, default: '' },
+  projectMissing: { type: Boolean, default: false }
 })
 
 defineEmits(['next-step'])
@@ -296,6 +307,54 @@ watch(() => props.systemLogs.length, () => {
   display: flex;
   flex-direction: column;
   gap: 20px;
+}
+
+/* 原始专案已遗失的空状态卡片 */
+.project-missing-card {
+  margin: auto;
+  max-width: 380px;
+  text-align: center;
+  background: #FFF;
+  border: 1px solid #EAEAEA;
+  border-radius: 8px;
+  padding: 40px 28px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.04);
+}
+
+.missing-icon {
+  font-size: 32px;
+  color: #F59E0B;
+  margin-bottom: 16px;
+}
+
+.missing-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #111;
+  margin: 0 0 12px;
+}
+
+.missing-desc {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.7;
+  margin: 0 0 24px;
+}
+
+.missing-back-btn {
+  background: #000;
+  color: #FFF;
+  border: none;
+  padding: 10px 24px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.missing-back-btn:hover {
+  opacity: 0.8;
 }
 
 .step-card {

@@ -358,7 +358,12 @@
     "statusCompleted": "已完成",
     "statusRunning": "推演中",
     "statusFailed": "已中止",
-    "retentionNotice": "推演記錄保留 30 天"
+    "retentionNotice": "推演記錄保留 30 天",
+    "projectLostBadge": "原始專案已遺失"
+  },
+  "process": {
+    "projectMissingTitle": "原始專案資料已遺失",
+    "projectMissingDesc": "此推演的原始專案資料已不存在，可能因服務重新部署而遺失。圖譜構建功能不可用，但已完成的模擬結果與報告不受影響。"
   },
   "subscription": {
     "plans": "訂閱方案",

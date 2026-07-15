@@ -29,8 +29,7 @@ from sqlalchemy import func, select  # noqa: E402
 def _find_json_path() -> str:
     candidates = [
         Config.USER_DATA_FILE,
-        Config.LEGACY_USER_DATA_FILE,
-        os.path.join(os.path.dirname(__file__), "../../uploads/users.json"),
+        Config.LEGACY_USER_DATA_FILE,  # UPLOAD_FOLDER-derived, covers the old hardcoded uploads/users.json path
         "/data/users.json",
     ]
     for path in candidates:

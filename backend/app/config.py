@@ -49,7 +49,11 @@ class Config:
 
     # 文件上传配置
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
-    UPLOAD_FOLDER = os.path.join(os.path.dirname(__file__), '../uploads')
+    # 生产环境（如 Zeabur）容器文件系统是 ephemeral 的，务必通过 UPLOAD_FOLDER
+    # 环境变量指向一个持久化卷（persistent volume）挂载点，否则 redeploy 后
+    # projects/simulations/reports 等数据会全部丢失。未设置时回退到仓库内的
+    # backend/uploads，保持本机开发行为不变。
+    UPLOAD_FOLDER = os.environ.get('UPLOAD_FOLDER') or os.path.join(os.path.dirname(__file__), '../uploads')
     DATA_FOLDER = os.environ.get('USER_DATA_DIR', UPLOAD_FOLDER)
     # Kept for the JSON→DB migration script; no longer the primary user store
     USER_DATA_FILE = os.environ.get(
@@ -65,7 +69,7 @@ class Config:
     
     # OASIS模拟配置
     OASIS_DEFAULT_MAX_ROUNDS = int(os.environ.get('OASIS_DEFAULT_MAX_ROUNDS', '10'))
-    OASIS_SIMULATION_DATA_DIR = os.path.join(os.path.dirname(__file__), '../uploads/simulations')
+    OASIS_SIMULATION_DATA_DIR = os.path.join(UPLOAD_FOLDER, 'simulations')
     
     # OASIS平台可用动作配置
     OASIS_TWITTER_ACTIONS = [

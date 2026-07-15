@@ -36,9 +36,9 @@
         <div class="card-header">
           <span class="card-id">{{ formatSimulationId(project.simulation_id) }}</span>
           <div class="card-status-icons">
-            <span 
-              class="status-icon" 
-              :class="{ available: project.project_id, unavailable: !project.project_id }"
+            <span
+              class="status-icon"
+              :class="{ available: project.project_id && project.project_exists !== false, unavailable: !project.project_id || project.project_exists === false }"
               :title="$t('history.graphBuild')"
             >◇</span>
             <span 
@@ -86,6 +86,11 @@
         <!-- 卡片描述（模拟需求完整展示） -->
         <p class="card-desc">{{ truncateText(project.simulation_requirement, 55) }}</p>
 
+        <!-- 原始专案已遗失标示 -->
+        <span v-if="project.project_id && project.project_exists === false" class="project-lost-badge">
+          {{ $t('history.projectLostBadge') }}
+        </span>
+
         <!-- 卡片底部 -->
         <div class="card-footer">
           <div class="card-datetime">
@@ -120,6 +125,10 @@
                 <span class="modal-progress" :class="getProgressClass(selectedProject)">
                   <span class="status-dot">●</span> {{ formatRounds(selectedProject) }}
                 </span>
+                <span
+                  v-if="selectedProject.project_id && selectedProject.project_exists === false"
+                  class="project-lost-badge"
+                >{{ $t('history.projectLostBadge') }}</span>
                 <span class="modal-create-time">{{ formatDate(selectedProject.created_at) }} {{ formatTime(selectedProject.created_at) }}</span>
               </div>
               <button class="modal-close" @click="closeModal">×</button>
@@ -921,6 +930,22 @@ onUnmounted(() => {
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
+}
+
+/* 原始专案已遗失标示 */
+.project-lost-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  margin-bottom: 10px;
+  background: #F3F4F6;
+  color: #6B7280;
+  border: 1px solid #E5E7EB;
+  border-radius: 3px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.3px;
 }
 
 /* 卡片底部 */

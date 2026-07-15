@@ -40,10 +40,11 @@
     <main class="content-area">
       <!-- Left Panel: Graph -->
       <div class="panel-wrapper left" :style="leftPanelStyle">
-        <GraphPanel 
+        <GraphPanel
           :graphData="graphData"
           :loading="graphLoading"
           :currentPhase="currentPhase"
+          :projectMissing="projectMissing"
           @refresh="refreshGraph"
           @toggle-maximize="toggleMaximize('graph')"
         />
@@ -61,6 +62,7 @@
           :graphData="graphData"
           :systemLogs="systemLogs"
           :error="error"
+          :projectMissing="projectMissing"
           @next-step="handleNextStep"
         />
         <!-- Step 2: 环境搭建 -->
@@ -104,6 +106,7 @@ const currentProjectId = ref(route.params.projectId)
 const loading = ref(false)
 const graphLoading = ref(false)
 const error = ref('')
+const projectMissing = ref(false) // 原始专案已不存在（例如 ephemeral 容器 redeploy 后被清空）
 const projectData = ref(null)
 const graphData = ref(null)
 const currentPhase = ref(-1) // -1: Upload, 0: Ontology, 1: Build, 2: Complete
@@ -130,12 +133,14 @@ const rightPanelStyle = computed(() => {
 
 // --- Status Computed ---
 const statusClass = computed(() => {
+  if (projectMissing.value) return 'error'
   if (error.value) return 'error'
   if (currentPhase.value >= 2) return 'completed'
   return 'processing'
 })
 
 const statusText = computed(() => {
+  if (projectMissing.value) return t('process.projectMissingTitle')
   if (error.value) return 'Error'
   if (currentPhase.value >= 2) return 'Ready'
   if (currentPhase.value === 1) return 'Building Graph'
@@ -259,8 +264,15 @@ const loadProject = async () => {
       addLog(`Error loading project: ${res.error}`)
     }
   } catch (err) {
-    error.value = err.message
-    addLog(`Exception in loadProject: ${err.message}`)
+    if (err.status === 404) {
+      // 原始专案目录已不存在（例如容器 redeploy 清空了 ephemeral 存储），
+      // 这是一个可预期的孤儿记录状态，不是异常故障，走专门的空状态展示
+      projectMissing.value = true
+      addLog(`Project not found (original data likely lost): ${currentProjectId.value}`)
+    } else {
+      error.value = err.message
+      addLog(`Exception in loadProject: ${err.message}`)
+    }
   } finally {
     loading.value = false
   }
