@@ -359,7 +359,12 @@
     "statusRunning": "推演中",
     "statusFailed": "已中止",
     "retentionNotice": "推演記錄保留 30 天",
-    "projectLostBadge": "原始專案已遺失"
+    "projectLostBadge": "原始專案已遺失",
+    "deleteRecord": "刪除記錄",
+    "deleteConfirm": "確定要刪除推演記錄 {id} 嗎？刪除後將無法在介面中復原。",
+    "deleteSuccess": "推演記錄已刪除。",
+    "deleteRequiresSubscriptionTooltip": "此功能需要訂閱方案。",
+    "deleteFailedGeneric": "刪除記錄失敗，請稍後再試。"
   },
   "process": {
     "projectMissingTitle": "原始專案資料已遺失",
@@ -576,6 +581,10 @@
     "graphNotBuilt": "專案尚未構建圖譜，請先呼叫 /api/graph/build",
     "requireSimulationId": "請提供 simulation_id",
     "simulationNotFound": "模擬不存在: {id}",
+    "recordNotFound": "找不到該筆推演記錄",
+    "accessDenied": "無權限存取",
+    "deleteRequiresSubscription": "刪除推演記錄需要有效的付費訂閱方案（Lite / Premium / Pro）。",
+    "deleteBlockedRunning": "此模擬仍在準備中或運行中，請先停止模擬再刪除此記錄。",
     "projectMissingRequirement": "專案缺少模擬需求描述 (simulation_requirement)",
     "prepareStarted": "準備任務已啟動，請透過 /api/simulation/prepare/status 查詢進度",
     "alreadyPrepared": "已有完成的準備工作，無需重複生成",

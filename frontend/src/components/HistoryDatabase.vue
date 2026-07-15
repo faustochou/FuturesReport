@@ -195,8 +195,29 @@
             <div class="modal-playback-hint">
               <span class="hint-text">{{ $t('history.replayHint') }}</span>
             </div>
+
+            <!-- 刪除記錄（危險操作區） -->
+            <div class="modal-danger-zone">
+              <button
+                class="modal-btn btn-delete"
+                type="button"
+                :disabled="!canDeleteHistory || deleting"
+                :title="!canDeleteHistory ? $t('history.deleteRequiresSubscriptionTooltip') : ''"
+                @click="handleDeleteRecord"
+              >
+                <span class="btn-icon">✕</span>
+                <span class="btn-text">{{ $t('history.deleteRecord') }}</span>
+              </button>
+            </div>
           </div>
         </div>
+      </Transition>
+    </Teleport>
+
+    <!-- 刪除成功/失敗提示 -->
+    <Teleport to="body">
+      <Transition name="toast">
+        <div v-if="toast" class="delete-toast" :class="toast.type">{{ toast.message }}</div>
       </Transition>
     </Teleport>
   </div>
@@ -206,11 +227,36 @@
 import { ref, computed, onMounted, onUnmounted, onActivated, watch, nextTick } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useI18n } from 'vue-i18n'
-import { getSimulationRecords } from '../api/simulation'
+import { getSimulationRecords, deleteSimulationRecord } from '../api/simulation'
+import { authState } from '../store/auth'
 
 const router = useRouter()
 const route = useRoute()
 const { t } = useI18n()
+
+// 訂閱資格白名單，需與後端 subscription_service.DELETE_HISTORY_ALLOWED_TIERS 保持一致。
+// 後端才是真正的權限守門員，這裡只用來預先決定按鈕的啟用/停用狀態。
+const DELETE_HISTORY_ALLOWED_TIERS = ['lite', 'premium', 'pro']
+
+const canDeleteHistory = computed(() => {
+  const user = authState.user
+  if (!user) return false
+  if (user.is_admin) return true
+  const sub = user.subscription
+  return !!sub
+    && ['active', 'trialing'].includes(sub.status)
+    && DELETE_HISTORY_ALLOWED_TIERS.includes(sub.tier_code)
+})
+
+const deleting = ref(false)
+const toast = ref(null)
+let toastTimer = null
+
+const showToast = (type, message) => {
+  toast.value = { type, message }
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => { toast.value = null }, 4000)
+}
 
 // 状态
 const projects = ref([])
@@ -439,6 +485,28 @@ const goToReport = () => {
   }
 }
 
+// 刪除推演記錄（軟刪除）：確認 -> 呼叫 API -> 從列表移除 -> 關閉彈窗 -> 提示
+const handleDeleteRecord = async () => {
+  const target = selectedProject.value
+  if (!target || !canDeleteHistory.value || deleting.value) return
+
+  const idLabel = formatSimulationId(target.simulation_id)
+  if (!confirm(t('history.deleteConfirm', { id: idLabel }))) return
+
+  deleting.value = true
+  try {
+    await deleteSimulationRecord(target.id)
+    projects.value = projects.value.filter(p => p.id !== target.id)
+    closeModal()
+    showToast('success', t('history.deleteSuccess'))
+  } catch (error) {
+    // 後端回傳的 403/409 錯誤訊息已依 Accept-Language 在地化，直接顯示即可
+    showToast('error', error.message || t('history.deleteFailedGeneric'))
+  } finally {
+    deleting.value = false
+  }
+}
+
 // 加载历史项目
 const loadHistory = async () => {
   try {
@@ -574,6 +642,11 @@ onUnmounted(() => {
   if (expandDebounceTimer) {
     clearTimeout(expandDebounceTimer)
     expandDebounceTimer = null
+  }
+  // 清理刪除提示的自動關閉定時器
+  if (toastTimer) {
+    clearTimeout(toastTimer)
+    toastTimer = null
   }
 })
 </script>
@@ -1203,6 +1276,10 @@ onUnmounted(() => {
   background: #F9FAFB;
   border: 1px solid #F3F4F6;
   border-radius: 8px;
+  max-height: 40vh;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .modal-files {
@@ -1375,5 +1452,77 @@ onUnmounted(() => {
   letter-spacing: 0.3px;
   text-align: center;
   line-height: 1.5;
+}
+
+/* 刪除記錄（危險操作區） */
+.modal-danger-zone {
+  padding: 0 32px 24px;
+  background: #FFFFFF;
+}
+
+.modal-btn.btn-delete {
+  width: 100%;
+  flex-direction: row;
+  justify-content: center;
+  border-color: #F3D4D4;
+}
+
+.modal-btn.btn-delete .btn-icon {
+  color: #D64545;
+  font-size: 1rem;
+}
+
+.modal-btn.btn-delete .btn-text {
+  color: #8C1F1F;
+}
+
+.modal-btn.btn-delete:hover:not(:disabled) {
+  background: #FFF5F5;
+  border-color: #D64545;
+  transform: none;
+  box-shadow: none;
+}
+
+.modal-btn.btn-delete:hover:not(:disabled) .btn-text {
+  color: #8C1F1F;
+}
+
+.modal-btn.btn-delete:disabled {
+  cursor: not-allowed;
+}
+
+/* 刪除成功/失敗提示（輕量 toast） */
+.delete-toast {
+  position: fixed;
+  bottom: 32px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 10000;
+  padding: 12px 24px;
+  border-radius: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #FFFFFF;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.delete-toast.success {
+  background: #10B981;
+}
+
+.delete-toast.error {
+  background: #EF4444;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: opacity 0.25s ease, transform 0.25s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
 }
 </style>

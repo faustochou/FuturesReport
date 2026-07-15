@@ -208,3 +208,11 @@ export const getSimulationRecords = (limit = 20, offset = 0) => {
   return service.get('/api/simulation/records', { params: { limit, offset } })
 }
 
+/**
+ * 刪除推演記錄（軟刪除，需登入 + 訂閱資格；本人或 admin）
+ * @param {number} recordId - 推演記錄的 id（非 simulation_id）
+ */
+export const deleteSimulationRecord = (recordId) => {
+  return service.delete(`/api/simulation/records/${recordId}`)
+}
+

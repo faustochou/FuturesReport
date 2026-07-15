@@ -1641,7 +1641,8 @@ def start_simulation():
             _rec_user = current_user()
             if _rec_user:
                 _rec_project = ProjectManager.get_project(state.project_id)
-                _rec_title = (_rec_project.simulation_requirement or "")[:100] if _rec_project else ""
+                _rec_full_requirement = (_rec_project.simulation_requirement or "") if _rec_project else ""
+                _rec_title = _rec_full_requirement[:100]
                 _rec_files = [
                     f.get("filename") or f.get("original_filename", "")
                     for f in (_rec_project.files or [])
@@ -1652,6 +1653,7 @@ def start_simulation():
                     project_id=state.project_id,
                     title=_rec_title,
                     report_filenames=_rec_files,
+                    full_requirement=_rec_full_requirement,
                 )
         except Exception as _rec_exc:
             logger.warning(f"推演記錄寫入失敗（不影響推演）: {_rec_exc}")
@@ -2777,8 +2779,14 @@ def _write_simulation_record(
     project_id,
     title: str,
     report_filenames: list,
+    full_requirement: str = "",
 ) -> None:
-    """Create or upsert a SimulationRecord row (keyed by simulation_id)."""
+    """Create or upsert a SimulationRecord row (keyed by simulation_id).
+
+    `title` stays truncated (legacy VARCHAR(200) column, kept for back-compat).
+    `full_requirement` holds the untruncated text and is what reads prefer —
+    see _to_dict() in the list/detail routes below.
+    """
     from sqlalchemy import select
     from ..db.database import get_db
     from ..db.models import SimulationRecord
@@ -2791,6 +2799,7 @@ def _write_simulation_record(
         if existing:
             existing.user_id = user_id
             existing.title = title
+            existing.full_requirement = full_requirement
             existing.report_filenames = report_filenames
         else:
             db.add(SimulationRecord(
@@ -2798,6 +2807,7 @@ def _write_simulation_record(
                 simulation_id=simulation_id,
                 project_id=project_id,
                 title=title,
+                full_requirement=full_requirement,
                 report_filenames=report_filenames,
                 started_at=now,
                 status="running",
@@ -2859,7 +2869,7 @@ def list_simulation_records():
             )
 
             is_admin = user.get("role") == "admin"
-            base_q = select(SimulationRecord)
+            base_q = select(SimulationRecord).where(SimulationRecord.deleted_at.is_(None))
             if not is_admin:
                 base_q = base_q.where(SimulationRecord.user_id == user["user_id"])
             base_q = base_q.order_by(SimulationRecord.started_at.desc())
@@ -2876,7 +2886,7 @@ def list_simulation_records():
                     "simulation_id": r.simulation_id,
                     "project_id": r.project_id,
                     "project_exists": _project_exists(r.project_id),
-                    "title": r.title,
+                    "title": r.full_requirement or r.title,
                     "report_filenames": filenames,
                     "started_at": r.started_at.isoformat() if r.started_at else None,
                     "completed_at": r.completed_at.isoformat() if r.completed_at else None,
@@ -2915,7 +2925,10 @@ def get_simulation_record(record_id: int):
         user = current_user()
         with get_db() as db:
             record = db.execute(
-                select(SimulationRecord).where(SimulationRecord.id == record_id)
+                select(SimulationRecord).where(
+                    SimulationRecord.id == record_id,
+                    SimulationRecord.deleted_at.is_(None),
+                )
             ).scalar_one_or_none()
             if not record:
                 return jsonify({"success": False, "error": "Record not found"}), 404
@@ -2930,7 +2943,7 @@ def get_simulation_record(record_id: int):
                     "simulation_id": record.simulation_id,
                     "project_id": record.project_id,
                     "project_exists": _project_exists(record.project_id),
-                    "title": record.title,
+                    "title": record.full_requirement or record.title,
                     "report_filenames": filenames,
                     "started_at": record.started_at.isoformat() if record.started_at else None,
                     "completed_at": record.completed_at.isoformat() if record.completed_at else None,
@@ -2943,3 +2956,89 @@ def get_simulation_record(record_id: int):
     except Exception as e:
         logger.error(f"查詢單筆推演記錄失敗: {e}")
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@simulation_bp.route('/records/<int:record_id>', methods=['DELETE'])
+@require_auth
+def delete_simulation_record(record_id: int):
+    """
+    刪除推演記錄（軟刪除 + 模擬資料目錄實體清理）
+
+    權限檢查順序：
+      (a) 已登入（@require_auth）
+      (b) 記錄屬於該用戶，或該用戶為 admin
+      (c) 訂閱資格：can_delete_history()（付費層級或 admin，見 subscription_service）
+
+    若該筆記錄仍在運行中（status == "running"，涵蓋準備中與運行中兩個階段，
+    因為 SimulationRecord.status 在 _finalize_simulation_record 完成/失敗前
+    只有 "running" 這一種進行中狀態），拒絕刪除並回 409。
+    """
+    try:
+        from sqlalchemy import select
+        from ..db.database import get_db
+        from ..db.models import SimulationRecord
+        from ..services.subscription_service import can_delete_history
+
+        user = current_user()
+        with get_db() as db:
+            record = db.execute(
+                select(SimulationRecord).where(
+                    SimulationRecord.id == record_id,
+                    SimulationRecord.deleted_at.is_(None),
+                )
+            ).scalar_one_or_none()
+            if not record:
+                return jsonify({
+                    "success": False,
+                    "error": t('api.recordNotFound')
+                }), 404
+
+            is_owner = record.user_id == user["user_id"]
+            is_admin = user.get("role") == "admin"
+            if not is_owner and not is_admin:
+                return jsonify({
+                    "success": False,
+                    "error": t('api.accessDenied'),
+                    "code": "ACCESS_DENIED"
+                }), 403
+
+            if not can_delete_history(user):
+                return jsonify({
+                    "success": False,
+                    "error": t('api.deleteRequiresSubscription'),
+                    "code": "SUBSCRIPTION_REQUIRED"
+                }), 403
+
+            if record.status == "running":
+                return jsonify({
+                    "success": False,
+                    "error": t('api.deleteBlockedRunning'),
+                    "code": "SIMULATION_RUNNING"
+                }), 409
+
+            simulation_id = record.simulation_id
+            record.deleted_at = datetime.utcnow()
+
+        # DB 事務已提交，接著清理模擬資料目錄以釋放磁碟空間（不存在則略過）
+        sim_dir = os.path.join(Config.OASIS_SIMULATION_DATA_DIR, simulation_id)
+        if os.path.isdir(sim_dir):
+            import shutil
+            shutil.rmtree(sim_dir, ignore_errors=True)
+
+        logger.info(f"推演記錄已刪除: record_id={record_id}, simulation_id={simulation_id}, by={user['user_id']}")
+
+        return jsonify({
+            "success": True,
+            "data": {
+                "record_id": record_id,
+                "simulation_id": simulation_id,
+            }
+        })
+
+    except Exception as e:
+        logger.error(f"刪除推演記錄失敗: {e}")
+        return jsonify({
+            "success": False,
+            "error": str(e),
+            "traceback": traceback.format_exc()
+        }), 500

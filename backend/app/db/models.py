@@ -215,6 +215,11 @@ class SimulationRecord(Base):
     simulation_id: Mapped[str] = mapped_column(String(64), nullable=False, unique=True, index=True)
     project_id: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
     title: Mapped[str] = mapped_column(String(200), nullable=False, default="")
+    # Untruncated simulation_requirement text. VARCHAR(200) `title` above predates
+    # this and is capped, so full text lives here instead of widening that column.
+    # Prefer this field when reading; fall back to `title` for rows written before
+    # this column existed (see api/simulation.py _to_dict / backfill script).
+    full_requirement: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     # Stored as JSON array of filename strings, e.g. ["report.pdf", "data.txt"]
     report_filenames: Mapped[Any] = mapped_column(_JsonColumn, nullable=False, default=list)
     started_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
@@ -224,6 +229,9 @@ class SimulationRecord(Base):
     result_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     result_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    # Soft delete: NULL = active row. Set on user-initiated deletion instead of
+    # a hard DELETE so the audit trail (and 30-day lazy cleanup) stays intact.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="simulation_records")
 

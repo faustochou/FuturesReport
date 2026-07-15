@@ -359,7 +359,12 @@
     "statusRunning": "Running",
     "statusFailed": "Aborted",
     "retentionNotice": "Records retained for 30 days",
-    "projectLostBadge": "Original project lost"
+    "projectLostBadge": "Original project lost",
+    "deleteRecord": "Delete Record",
+    "deleteConfirm": "Delete simulation record {id}? This cannot be undone from the interface.",
+    "deleteSuccess": "Simulation record deleted.",
+    "deleteRequiresSubscriptionTooltip": "This feature requires a subscription plan.",
+    "deleteFailedGeneric": "Failed to delete the record. Please try again."
   },
   "process": {
     "projectMissingTitle": "Original Project Data Unavailable",
@@ -576,6 +581,10 @@
     "graphNotBuilt": "Graph not yet built. Please call /api/graph/build first.",
     "requireSimulationId": "Please provide simulation_id",
     "simulationNotFound": "Simulation not found: {id}",
+    "recordNotFound": "History record not found",
+    "accessDenied": "Access denied",
+    "deleteRequiresSubscription": "Deleting history records requires an active paid subscription (Lite/Premium/Pro).",
+    "deleteBlockedRunning": "This simulation is still preparing or running. Stop it before deleting this record.",
     "projectMissingRequirement": "Project missing simulation requirement (simulation_requirement)",
     "prepareStarted": "Preparation task started. Query progress via /api/simulation/prepare/status.",
     "alreadyPrepared": "Preparation already complete. No need to regenerate.",

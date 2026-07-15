@@ -201,6 +201,36 @@ def check_feature(user_id: str, feature_key: str) -> bool:
     return bool(flags.get(feature_key, False))
 
 
+# Tiers allowed to delete their own simulation history records. Centralized
+# here (rather than a per-tier feature_flag) because this should default to
+# "on" for every paid tier — unlike check_feature's opt-in flags, which
+# default to off until an admin sets them on a tier.
+DELETE_HISTORY_ALLOWED_TIERS = {"lite", "premium", "pro"}
+
+
+def can_delete_history(user: Optional[Dict[str, Any]]) -> bool:
+    """Whether `user` (the dict returned by current_user()) may delete their
+    own simulation history records.
+
+    Admins always may. Users on a tier in DELETE_HISTORY_ALLOWED_TIERS with
+    an active/trialing subscription may. Everyone else (free tier, no
+    subscription, unauthenticated) may not.
+    """
+    if not user:
+        return False
+    if user.get("role") == "admin":
+        return True
+
+    sub = user.get("subscription")
+    if not sub:
+        return False
+
+    return (
+        sub.get("status") in ("active", "trialing")
+        and sub.get("tier_code") in DELETE_HISTORY_ALLOWED_TIERS
+    )
+
+
 # ---------------------------------------------------------------------------
 # Checkout Session
 # ---------------------------------------------------------------------------
