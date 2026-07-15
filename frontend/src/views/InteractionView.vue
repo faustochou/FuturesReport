@@ -33,6 +33,8 @@
           <span class="dot"></span>
           {{ statusText }}
         </span>
+        <div class="step-divider"></div>
+        <HeaderTools />
       </div>
     </header>
 
@@ -70,6 +72,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import GraphPanel from '../components/GraphPanel.vue'
 import Step5Interaction from '../components/Step5Interaction.vue'
+import HeaderTools from '../components/HeaderTools.vue'
 import { getProject, getGraphData } from '../api/graph'
 import { getSimulation } from '../api/simulation'
 import { getReport } from '../api/report'
@@ -292,23 +295,37 @@ onMounted(() => {
   align-items: center;
   gap: 8px;
   font-size: 14px;
+  min-width: 0;
 }
 
 .step-num {
   font-family: 'JetBrains Mono', monospace;
   font-weight: 700;
   color: #999;
+  flex-shrink: 0;
 }
 
 .step-name {
   font-weight: 700;
   color: #000;
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .step-divider {
   width: 1px;
   height: 14px;
   background-color: #E0E0E0;
+  flex-shrink: 0;
+}
+
+/* 筆電寬度下優先保證 Step 編號、狀態燈與帳號/語言工具不被擠壓或遮擋 */
+@media (max-width: 1536px) {
+  .step-name {
+    display: none;
+  }
 }
 
 .status-indicator {
@@ -318,6 +335,8 @@ onMounted(() => {
   font-size: 12px;
   color: #666;
   font-weight: 500;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .dot {

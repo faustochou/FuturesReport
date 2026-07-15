@@ -2,7 +2,7 @@
   <div class="auth-shell">
     <button class="auth-trigger" type="button" @click="togglePanel">
       <span class="status-dot" :class="{ ready: authState.user && authState.user.llm_configured }"></span>
-      <span>{{ triggerLabel }}</span>
+      <span class="trigger-label">{{ triggerLabel }}</span>
     </button>
 
     <Teleport to="body">
@@ -263,6 +263,15 @@ watch(() => authState.user, hydrateLlmForm)
   height: 8px;
   border-radius: 50%;
   background: #d64545;
+  flex-shrink: 0;
+}
+
+/* 防止過長的模型名稱（例如自訂 model id）撐爆 header，只截斷文字，按鈕本身不隨父層縮放 */
+.trigger-label {
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .status-dot.ready {

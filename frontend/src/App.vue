@@ -1,7 +1,8 @@
 <template>
-  <!-- 公開頁面使用 AppHeader；工作區頁面保留浮動工具列 -->
+  <!-- 公開頁面使用 AppHeader；五個 Step 工作流程頁面自帶 header，內嵌 HeaderTools，
+       不需要浮動工具列；其餘頁面（如隱私權政策）沒有自己的 header，才保留浮動工具列 -->
   <AppHeader v-if="showAppHeader" />
-  <div v-else class="global-tools">
+  <div v-else-if="showFloatingTools" class="global-tools">
     <LanguageSwitcher />
     <AuthPanel />
   </div>
@@ -18,7 +19,13 @@ import LanguageSwitcher from './components/LanguageSwitcher.vue'
 const route = useRoute()
 
 const PUBLIC_ROUTES = ['/', '/launch', '/subscription', '/admin']
+// 這五個路由對應的頁面（Process/Simulation/SimulationRun/Report/Interaction）都有
+// 自己的 app-header，並在 header-right 內嵌了 <HeaderTools />，因此不需要（也不應該）
+// 再疊加 App.vue 層級的浮動工具列，否則會蓋住頁面自己的 Step 資訊與狀態指示燈。
+const WORKSPACE_ROUTE_NAMES = ['Process', 'Simulation', 'SimulationRun', 'Report', 'Interaction']
+
 const showAppHeader = computed(() => PUBLIC_ROUTES.includes(route.path))
+const showFloatingTools = computed(() => !showAppHeader.value && !WORKSPACE_ROUTE_NAMES.includes(route.name))
 </script>
 
 <style>
