@@ -4,13 +4,24 @@ LLM客户端封装
 """
 
 import json
+import os
+import random
 import re
+import time
 import urllib.error
 import urllib.request
 from typing import Optional, Dict, Any, List
-from openai import OpenAI, NotFoundError
+from openai import OpenAI, NotFoundError, APIStatusError
 
 from ..config import Config
+from .logger import get_logger
+
+logger = get_logger('futuresreport.llm_client')
+
+# 429 错误 body 中 Gemini RetryInfo 的 retryDelay 字段，形如 "40s"
+_RETRY_DELAY_PATTERN = re.compile(r'"retryDelay"\s*:\s*"(\d+(?:\.\d+)?)s"')
+# 429 错误 body 中标识每日配额耗尽的 quotaId，形如 "GenerateContentPerDayPerProjectPerModel..."
+_PER_DAY_QUOTA_PATTERN = re.compile(r'"quotaId"\s*:\s*"[^"]*PerDay[^"]*"')
 
 # Providers whose APIs accept OpenAI-style response_format JSON mode.
 # Providers not listed here (e.g. nvidia) may reject the parameter,
@@ -81,19 +92,69 @@ class LLMClient:
         
         if response_format:
             kwargs["response_format"] = response_format
-        
-        try:
-            response = self.client.chat.completions.create(**kwargs)
-        except NotFoundError as exc:
-            raise ValueError(
-                f"模型 '{self.model}' 在 {self.provider} 上找不到。"
-                f"請至 AI Studio 確認可用模型，或在設定中更換模型名稱。"
-                f"（原始錯誤：{exc}）"
-            ) from exc
+
+        max_retries = int(os.environ.get('LLM_MAX_RETRIES', '5'))
+        base_delay = float(os.environ.get('LLM_RETRY_BASE_DELAY', '5'))
+
+        attempt = 0
+        while True:
+            try:
+                response = self.client.chat.completions.create(**kwargs)
+                break
+            except NotFoundError as exc:
+                raise ValueError(
+                    f"模型 '{self.model}' 在 {self.provider} 上找不到。"
+                    f"請至 AI Studio 確認可用模型，或在設定中更換模型名稱。"
+                    f"（原始錯誤：{exc}）"
+                ) from exc
+            except APIStatusError as exc:
+                if exc.status_code != 429:
+                    raise
+
+                self._raise_if_daily_quota_exhausted(exc)
+
+                attempt += 1
+                if attempt > max_retries:
+                    raise
+
+                delay = self._compute_retry_delay(exc, attempt, base_delay)
+                logger.warning(
+                    f"LLM 請求觸發速率限制 (429)，第 {attempt}/{max_retries} 次重試，"
+                    f"等待 {delay:.1f} 秒後繼續..."
+                )
+                time.sleep(delay)
+
         content = response.choices[0].message.content
         # 部分模型（如MiniMax M2.5）会在content中包含<think>思考内容，需要移除
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
         return content
+
+    @staticmethod
+    def _error_body_text(exc: APIStatusError) -> str:
+        """将异常的 body（可能是 dict/list/str/None）统一转成可正则匹配的文本"""
+        body = getattr(exc, 'body', None)
+        if isinstance(body, (dict, list)):
+            return json.dumps(body, ensure_ascii=False)
+        if body is not None:
+            return str(body)
+        return str(exc)
+
+    def _raise_if_daily_quota_exhausted(self, exc: APIStatusError) -> None:
+        """若 429 错误是每日配额耗尽（而非短期限流），重试无意义，直接抛出明确提示"""
+        text = self._error_body_text(exc)
+        if _PER_DAY_QUOTA_PATTERN.search(text):
+            raise RuntimeError(
+                "每日免費配額已用盡，請升級方案、更換 API key，或改用其他模型。"
+            ) from exc
+
+    def _compute_retry_delay(self, exc: APIStatusError, attempt: int, base_delay: float) -> float:
+        """优先使用服务端返回的 RetryInfo.retryDelay，否则使用指数退避 + jitter"""
+        text = self._error_body_text(exc)
+        match = _RETRY_DELAY_PATTERN.search(text)
+        if match:
+            return float(match.group(1)) + 2
+
+        return base_delay * (2 ** (attempt - 1)) + random.uniform(0, 1)
 
     def _chat_anthropic(
         self,

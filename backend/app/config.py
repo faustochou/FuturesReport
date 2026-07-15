@@ -32,6 +32,12 @@ class Config:
     LLM_API_KEY = os.environ.get('LLM_API_KEY')
     LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
     LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
+
+    # Report Agent 专用 LLM 配置（可选）
+    # 未设置时回退到上方通用 LLM_* 配置，用于将报告生成与模拟的 LLM 配额分开，减轻限流压力
+    REPORT_LLM_API_KEY = os.environ.get('REPORT_LLM_API_KEY') or LLM_API_KEY
+    REPORT_LLM_BASE_URL = os.environ.get('REPORT_LLM_BASE_URL') or LLM_BASE_URL
+    REPORT_LLM_MODEL_NAME = os.environ.get('REPORT_LLM_MODEL_NAME') or LLM_MODEL_NAME
     
     # Zep配置
     ZEP_API_KEY = os.environ.get('ZEP_API_KEY')

@@ -1330,21 +1330,23 @@ async def run_twitter_simulation(
 
 
 async def run_reddit_simulation(
-    config: Dict[str, Any], 
+    config: Dict[str, Any],
     simulation_dir: str,
     action_logger: Optional[PlatformActionLogger] = None,
     main_logger: Optional[SimulationLogManager] = None,
-    max_rounds: Optional[int] = None
+    max_rounds: Optional[int] = None,
+    start_round: int = 0
 ) -> PlatformSimulation:
     """运行Reddit模拟
-    
+
     Args:
         config: 模拟配置
         simulation_dir: 模拟目录
         action_logger: 动作日志记录器
         main_logger: 主日志管理器
         max_rounds: 最大模拟轮数（可选，用于截断过长的模拟）
-        
+        start_round: 恢复运行的起始轮次（可选，用于 checkpoint 恢复）
+
     Returns:
         PlatformSimulation: 包含env和agent_graph的结果对象
     """
