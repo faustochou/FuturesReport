@@ -981,6 +981,25 @@ def _get_comment_info(
     return None
 
 
+# LLM 并发信号量的预设值。fork 改为由环境变量注入并发限制（原上游硬编码 semaphore=30），
+# 该值需在使用前先完成赋值，见 get_llm_semaphore() 与其在各函数中的调用位置。
+DEFAULT_LLM_SEMAPHORE = 6
+
+
+def get_llm_semaphore() -> int:
+    """读取 LLM 并发限制环境变量 LLM_CONCURRENCY_LIMIT。
+
+    转型失败或值小于 1 时回退到 DEFAULT_LLM_SEMAPHORE，保证任何调用路径都能
+    拿到一个合法的正整数，不会出现 UnboundLocalError。
+    """
+    raw = os.environ.get('LLM_CONCURRENCY_LIMIT', str(DEFAULT_LLM_SEMAPHORE))
+    try:
+        value = int(raw)
+    except (TypeError, ValueError):
+        return DEFAULT_LLM_SEMAPHORE
+    return value if value >= 1 else DEFAULT_LLM_SEMAPHORE
+
+
 def create_model(config: Dict[str, Any], use_boost: bool = False):
     """
     创建LLM模型
@@ -1132,14 +1151,19 @@ async def run_twitter_simulation(
         PlatformSimulation: 包含env和agent_graph的结果对象
     """
     result = PlatformSimulation()
-    
+
     def log_info(msg):
         if main_logger:
             main_logger.info(f"[Twitter] {msg}")
         print(f"[Twitter] {msg}")
-    
+
     log_info("初始化...")
-    
+
+    # 无条件在函数开头完成赋值，确保 oasis.make() 使用前 semaphore 一定已就绪
+    # （包括 checkpoint 恢复、twitter-only 等所有执行路径）
+    semaphore = get_llm_semaphore()
+    log_info(f"LLM 并发限制: {semaphore}")
+
     # Twitter 使用通用 LLM 配置
     model = create_model(config, use_boost=False)
     
@@ -1241,13 +1265,9 @@ async def run_twitter_simulation(
     effective_start = max(start_round, 0)
     if effective_start > 0:
         log_info(f"从第 {effective_start + 1} 轮恢复运行")
-    
-    # 动态 semaphore from runner-injected env (低资源保护)
-    semaphore = int(os.environ.get('LLM_CONCURRENCY_LIMIT', '8'))
-    log_info(f"使用 LLM semaphore={semaphore}")
-    
+
     start_time = datetime.now()
-    
+
     for round_num in range(effective_start, total_rounds):
         # 检查是否收到退出信号
         if _shutdown_event and _shutdown_event.is_set():
@@ -1351,14 +1371,19 @@ async def run_reddit_simulation(
         PlatformSimulation: 包含env和agent_graph的结果对象
     """
     result = PlatformSimulation()
-    
+
     def log_info(msg):
         if main_logger:
             main_logger.info(f"[Reddit] {msg}")
         print(f"[Reddit] {msg}")
-    
+
     log_info("初始化...")
-    
+
+    # 无条件在函数开头完成赋值，确保 oasis.make() 使用前 semaphore 一定已就绪
+    # （包括 checkpoint 恢复、reddit-only 等所有执行路径）
+    semaphore = get_llm_semaphore()
+    log_info(f"LLM 并发限制: {semaphore}")
+
     # Reddit 使用加速 LLM 配置（如果有的话，否则回退到通用配置）
     model = create_model(config, use_boost=True)
     
@@ -1467,13 +1492,9 @@ async def run_reddit_simulation(
     effective_start = max(start_round, 0)
     if effective_start > 0:
         log_info(f"从第 {effective_start + 1} 轮恢复运行")
-    
-    # 动态 semaphore from runner-injected env (低资源保护)
-    semaphore = int(os.environ.get('LLM_CONCURRENCY_LIMIT', '8'))
-    log_info(f"使用 LLM semaphore={semaphore}")
-    
+
     start_time = datetime.now()
-    
+
     for round_num in range(effective_start, total_rounds):
         # 检查是否收到退出信号
         if _shutdown_event and _shutdown_event.is_set():
@@ -1644,8 +1665,9 @@ async def main():
     if start_round > 0 or args.resume:
         log_manager.info(f"  - 恢复/续跑模式: 从 round {start_round} 开始")
     log_manager.info(f"  - Agent数量: {len(config.get('agent_configs', []))}")
-    # 读取限制（由 runner 注入）
-    llm_sem = int(os.environ.get('LLM_CONCURRENCY_LIMIT', '8'))
+    # 读取限制（由 runner 注入），与 run_twitter_simulation/run_reddit_simulation
+    # 使用同一个 get_llm_semaphore() 作为单一可靠来源
+    llm_sem = get_llm_semaphore()
     log_manager.info(f"  - LLM并发限制: {llm_sem} (env)")
     
     log_manager.info("日志结构:")
