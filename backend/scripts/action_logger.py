@@ -77,15 +77,23 @@ class PlatformActionLogger:
         with open(self.log_path, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
     
-    def log_round_end(self, round_num: int, actions_count: int):
-        """记录轮次结束"""
+    def log_round_end(self, round_num: int, actions_count: int, failed_count: int = 0):
+        """记录轮次结束
+
+        Args:
+            round_num: 轮次编号
+            actions_count: 本轮实际产生的动作数
+            failed_count: 本轮 LLM 调用失败（未产生任何动作）的 agent 数，
+                用于前端监视器展示与后端熔断判定
+        """
         entry = {
             "round": round_num,
             "timestamp": datetime.now().isoformat(),
             "event_type": "round_end",
             "actions_count": actions_count,
+            "failed_count": failed_count,
         }
-        
+
         with open(self.log_path, 'a', encoding='utf-8') as f:
             f.write(json.dumps(entry, ensure_ascii=False) + '\n')
     

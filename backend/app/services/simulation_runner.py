@@ -126,7 +126,12 @@ class SimulationRunState:
     reddit_running: bool = False
     twitter_actions_count: int = 0
     reddit_actions_count: int = 0
-    
+
+    # 各平台累计的 LLM 调用失败数（来自 round_end 事件的 failed_count，用于监视器
+    # 展示与「零动作空转完成」问题的前端提示，见 _read_action_log 的 round_end 处理）
+    twitter_failed_count: int = 0
+    reddit_failed_count: int = 0
+
     # 平台完成状态（通过检测 actions.jsonl 中的 simulation_end 事件）
     twitter_completed: bool = False
     reddit_completed: bool = False
@@ -188,6 +193,8 @@ class SimulationRunState:
             "twitter_actions_count": self.twitter_actions_count,
             "reddit_actions_count": self.reddit_actions_count,
             "total_actions_count": self.twitter_actions_count + self.reddit_actions_count,
+            "twitter_failed_count": self.twitter_failed_count,
+            "reddit_failed_count": self.reddit_failed_count,
             "started_at": self.started_at,
             "updated_at": self.updated_at,
             "completed_at": self.completed_at,
@@ -278,6 +285,8 @@ class SimulationRunner:
                 reddit_completed=data.get("reddit_completed", False),
                 twitter_actions_count=data.get("twitter_actions_count", 0),
                 reddit_actions_count=data.get("reddit_actions_count", 0),
+                twitter_failed_count=data.get("twitter_failed_count", 0),
+                reddit_failed_count=data.get("reddit_failed_count", 0),
                 started_at=data.get("started_at"),
                 updated_at=data.get("updated_at", datetime.now().isoformat()),
                 completed_at=data.get("completed_at"),
@@ -724,17 +733,20 @@ class SimulationRunner:
                                 elif event_type == "round_end":
                                     round_num = action_data.get("round", 0)
                                     simulated_hours = action_data.get("simulated_hours", 0)
-                                    
+                                    failed_count = action_data.get("failed_count", 0)
+
                                     # 更新各平台独立的轮次和时间
                                     if platform == "twitter":
                                         if round_num > state.twitter_current_round:
                                             state.twitter_current_round = round_num
                                         state.twitter_simulated_hours = simulated_hours
+                                        state.twitter_failed_count += failed_count
                                     elif platform == "reddit":
                                         if round_num > state.reddit_current_round:
                                             state.reddit_current_round = round_num
                                         state.reddit_simulated_hours = simulated_hours
-                                    
+                                        state.reddit_failed_count += failed_count
+
                                     # 总体轮次取两个平台的最大值
                                     if round_num > state.current_round:
                                         state.current_round = round_num

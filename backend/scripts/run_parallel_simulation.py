@@ -121,16 +121,22 @@ def disable_oasis_logging():
     """
     禁用 OASIS 库的详细日志输出
     OASIS 的日志太冗余（记录每个 agent 的观察和动作），我们使用自己的 action_logger
+
+    注意："social.agent" 不在这个屏蔽列表里——OASIS 自身在
+    oasis/social_agent/agent.py 的 perform_action_by_llm() 里会 catch 每个
+    agent 的 LLM 调用异常（如 429），记录到这个 logger 后返回而不重新抛出，
+    调用方（env.step()）完全感知不到失败，只会安静地拿到零动作。以前这里把
+    "social.agent" 也压到 CRITICAL 并清空 handler，等于把仅存的这一条错误线索
+    也丢掉了。现在改由 configure_agent_error_bridge() 单独接管它，只放行
+    ERROR 级别（过滤掉噪音很大的 INFO 级观察/动作日志），并转发到主日志。
     """
-    # 禁用 OASIS 的所有日志器
     oasis_loggers = [
-        "social.agent",
-        "social.twitter", 
+        "social.twitter",
         "social.rec",
         "oasis.env",
         "table",
     ]
-    
+
     for logger_name in oasis_loggers:
         logger = logging.getLogger(logger_name)
         logger.setLevel(logging.CRITICAL)  # 只记录严重错误
@@ -138,16 +144,110 @@ def disable_oasis_logging():
         logger.propagate = False
 
 
+class AgentErrorBridge(logging.Handler):
+    """把 OASIS 'social.agent' logger 里 ERROR 级别的记录（LLM 调用失败等）
+    收集起来，交给调用方按轮次节流后写入本脚本自己的主日志。
+
+    注意：双平台默认通过 asyncio.gather 并发运行，而 "social.agent" 是进程内
+    全局共享的 logger，这里收集到的错误消息无法保证百分之百归属到某一个平台。
+    因此这个 bridge 只用于诊断展示（把原本被完全吞掉的错误文本找回来，写成
+    WARNING 日志），不参与熔断判定——熔断判定见各自 round 循环里基于
+    active_agents / 实际动作数的精确统计，天然按平台隔离，不受此限制。
+    """
+
+    def __init__(self):
+        super().__init__(level=logging.ERROR)
+        self._pending: list = []
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            self._pending.append(record.getMessage())
+        except Exception:
+            pass
+
+    def drain(self) -> list:
+        messages, self._pending = self._pending, []
+        return messages
+
+
+_agent_error_bridge: Optional[AgentErrorBridge] = None
+
+
+def configure_agent_error_bridge() -> AgentErrorBridge:
+    """配置（幂等）并返回全局唯一的 AgentErrorBridge 实例"""
+    global _agent_error_bridge
+    if _agent_error_bridge is None:
+        _agent_error_bridge = AgentErrorBridge()
+        agent_logger = logging.getLogger("social.agent")
+        agent_logger.setLevel(logging.ERROR)  # 仍屏蔽冗余的 INFO 级观察/动作日志
+        agent_logger.handlers.clear()
+        agent_logger.addHandler(_agent_error_bridge)
+        agent_logger.propagate = False
+    return _agent_error_bridge
+
+
+def report_agent_errors(log_info, max_detail: int = 3) -> int:
+    """取出自上次调用以来 AgentErrorBridge 累积的错误，节流后写入主日志
+
+    每轮调用一次，最多完整记录 max_detail 条，其余只计入总数汇总一行，
+    避免大量重复的 429 错误刷屏。
+
+    Returns:
+        本次取出的错误消息总数
+    """
+    messages = configure_agent_error_bridge().drain()
+    if not messages:
+        return 0
+    for msg in messages[:max_detail]:
+        log_info(f"[LLM错误] {msg}")
+    if len(messages) > max_detail:
+        log_info(f"[LLM错误] 另有 {len(messages) - max_detail} 次同类错误未逐条记录（本轮共 {len(messages)} 次）")
+    return len(messages)
+
+
+def _describe_llm_error(exc: Exception) -> str:
+    """把 LLM 预检异常转换成简洁易读的中文摘要"""
+    status_code = getattr(exc, 'status_code', None)
+    text = str(exc)
+    lower_text = text.lower()
+    if status_code == 429 or 'resource_exhausted' in lower_text or '429' in text:
+        return f"429 配额超限（{text[:150]}）"
+    if status_code == 401 or 'authentication' in lower_text or 'invalid api key' in lower_text:
+        return f"401 认证失败，API Key 可能无效（{text[:150]}）"
+    if status_code is not None:
+        return f"{status_code} 错误（{text[:150]}）"
+    return text[:200]
+
+
+async def preflight_check_llm(model, log_info) -> Optional[str]:
+    """模拟正式开跑前的 LLM 预检：发一次最小测试请求，确认 API key / 配额可用。
+
+    避免在 agent 层因 429 等错误静默失败、空转烧掉 N 轮配额才被发现。
+
+    Returns:
+        None 表示预检通过；否则返回失败原因（中文，供上层直接展示）
+    """
+    try:
+        log_info("正在预检 LLM 连通性...")
+        await model.arun([{"role": "user", "content": "ping"}])
+        log_info("LLM 预检通过")
+        return None
+    except Exception as e:
+        return _describe_llm_error(e)
+
+
 def init_logging_for_simulation(simulation_dir: str):
     """
     初始化模拟的日志配置
-    
+
     Args:
         simulation_dir: 模拟目录路径
     """
     # 禁用 OASIS 的详细日志
     disable_oasis_logging()
-    
+    # 单独接管 "social.agent"，让其 ERROR 级别的 LLM 失败记录能被找回来
+    configure_agent_error_bridge()
+
     # 清理旧的 log 目录（如果存在）
     old_log_dir = os.path.join(simulation_dir, "log")
     if os.path.exists(old_log_dir):
@@ -985,6 +1085,10 @@ def _get_comment_info(
 # 该值需在使用前先完成赋值，见 get_llm_semaphore() 与其在各函数中的调用位置。
 DEFAULT_LLM_SEMAPHORE = 6
 
+# 连续多少轮「有活跃 agent 但零动作」即判定为 LLM 熔断（疑似配额耗尽），中止模拟。
+# 单独定义成常量方便调整。
+CONSECUTIVE_ZERO_ACTION_ROUNDS_LIMIT = 2
+
 
 def get_llm_semaphore() -> int:
     """读取 LLM 并发限制环境变量 LLM_CONCURRENCY_LIMIT。
@@ -1166,13 +1270,22 @@ async def run_twitter_simulation(
 
     # Twitter 使用通用 LLM 配置
     model = create_model(config, use_boost=False)
-    
+
     # OASIS Twitter使用CSV格式
     profile_path = os.path.join(simulation_dir, "twitter_profiles.csv")
     if not os.path.exists(profile_path):
         log_info(f"错误: Profile文件不存在: {profile_path}")
         return result
-    
+
+    # 启动前预检：先发一次最小测试请求，避免 API key/配额有问题时静默空转烧掉整轮模拟
+    preflight_error = await preflight_check_llm(model, log_info)
+    if preflight_error:
+        error_msg = f"LLM 预检失败：{preflight_error}。请检查 API 配额或金钥设定，模拟未启动。"
+        log_info(error_msg)
+        if main_logger:
+            main_logger.error(f"[Twitter] {error_msg}")
+        sys.exit(1)
+
     result.agent_graph = await generate_twitter_agent_graph(
         profile_path=profile_path,
         model=model,
@@ -1267,6 +1380,7 @@ async def run_twitter_simulation(
         log_info(f"从第 {effective_start + 1} 轮恢复运行")
 
     start_time = datetime.now()
+    consecutive_zero_action_rounds = 0  # 连续「有活跃 agent 但零动作」轮数，用于 LLM 熔断判定
 
     for round_num in range(effective_start, total_rounds):
         # 检查是否收到退出信号
@@ -1274,33 +1388,34 @@ async def run_twitter_simulation(
             if main_logger:
                 main_logger.info(f"收到退出信号，在第 {round_num + 1} 轮停止模拟")
             break
-        
+
         simulated_minutes = round_num * minutes_per_round
         simulated_hour = (simulated_minutes // 60) % 24
         simulated_day = simulated_minutes // (60 * 24) + 1
-        
+
         active_agents = get_active_agents_for_round(
             result.env, config, simulated_hour, round_num
         )
-        
+
         # 无论是否有活跃agent，都记录round开始
         if action_logger:
             action_logger.log_round_start(round_num + 1, simulated_hour)
-        
+
         if not active_agents:
             # 没有活跃agent时也记录round结束（actions_count=0）
+            # 注意：这是「本轮时间表上没有需要激活的 agent」，与 LLM 失败无关，不计入熔断
             if action_logger:
                 action_logger.log_round_end(round_num + 1, 0)
             continue
-        
+
         actions = {agent: LLMAction() for _, agent in active_agents}
         await result.env.step(actions)
-        
+
         # 从数据库获取实际执行的动作并记录
         actual_actions, last_rowid = fetch_new_actions_from_db(
             db_path, last_rowid, agent_names
         )
-        
+
         round_action_count = 0
         for action_data in actual_actions:
             if action_logger:
@@ -1313,14 +1428,40 @@ async def run_twitter_simulation(
                 )
                 total_actions += 1
                 round_action_count += 1
-        
+
+        # 每个活跃 agent 每轮至多产生一个动作（含 DO_NOTHING），所以「活跃数 - 实际动作数」
+        # 就是本轮 LLM 调用失败（或未产生有效工具调用）的 agent 数，精确且天然按平台隔离
+        round_fail_count = max(len(active_agents) - round_action_count, 0)
+
+        # 尽力而为地把本轮期间 OASIS 内部捕获到的原始 LLM 错误文本节流写入主日志
+        # （诊断用，双平台并发时无法保证 100% 归属到本平台，见 report_agent_errors 说明）
+        if round_fail_count > 0:
+            report_agent_errors(log_info)
+
         if action_logger:
-            action_logger.log_round_end(round_num + 1, round_action_count)
-        
+            action_logger.log_round_end(round_num + 1, round_action_count, round_fail_count)
+
+        # LLM 熔断判定：连续 N 轮「有活跃 agent 但零动作」
+        if round_action_count == 0 and round_fail_count > 0:
+            consecutive_zero_action_rounds += 1
+        else:
+            consecutive_zero_action_rounds = 0
+
+        if consecutive_zero_action_rounds >= CONSECUTIVE_ZERO_ACTION_ROUNDS_LIMIT:
+            _platform_tag = "Twitter" if "twitter" in str(log_info) else "Reddit"
+            abort_msg = (
+                f"连续 {consecutive_zero_action_rounds} 轮所有 agent 动作失败，"
+                f"疑似 LLM 配额耗尽，模拟已中止"
+            )
+            log_info(abort_msg)
+            if main_logger:
+                main_logger.error(f"[{_platform_tag}] {abort_msg}")
+            sys.exit(1)
+
         if (round_num + 1) % 20 == 0:
             progress = (round_num + 1) / total_rounds * 100
             log_info(f"Day {simulated_day}, {simulated_hour:02d}:00 - Round {round_num + 1}/{total_rounds} ({progress:.1f}%)")
-        
+
         # 轻量 checkpoint（每 N 轮）
         ckpt_interval = int(os.environ.get('SIM_CHECKPOINT_INTERVAL', '5'))
         if ckpt_interval > 0 and (round_num + 1) % ckpt_interval == 0:
@@ -1386,12 +1527,21 @@ async def run_reddit_simulation(
 
     # Reddit 使用加速 LLM 配置（如果有的话，否则回退到通用配置）
     model = create_model(config, use_boost=True)
-    
+
     profile_path = os.path.join(simulation_dir, "reddit_profiles.json")
     if not os.path.exists(profile_path):
         log_info(f"错误: Profile文件不存在: {profile_path}")
         return result
-    
+
+    # 启动前预检：先发一次最小测试请求，避免 API key/配额有问题时静默空转烧掉整轮模拟
+    preflight_error = await preflight_check_llm(model, log_info)
+    if preflight_error:
+        error_msg = f"LLM 预检失败：{preflight_error}。请检查 API 配额或金钥设定，模拟未启动。"
+        log_info(error_msg)
+        if main_logger:
+            main_logger.error(f"[Reddit] {error_msg}")
+        sys.exit(1)
+
     result.agent_graph = await generate_reddit_agent_graph(
         profile_path=profile_path,
         model=model,
@@ -1494,6 +1644,7 @@ async def run_reddit_simulation(
         log_info(f"从第 {effective_start + 1} 轮恢复运行")
 
     start_time = datetime.now()
+    consecutive_zero_action_rounds = 0  # 连续「有活跃 agent 但零动作」轮数，用于 LLM 熔断判定
 
     for round_num in range(effective_start, total_rounds):
         # 检查是否收到退出信号
@@ -1501,33 +1652,34 @@ async def run_reddit_simulation(
             if main_logger:
                 main_logger.info(f"收到退出信号，在第 {round_num + 1} 轮停止模拟")
             break
-        
+
         simulated_minutes = round_num * minutes_per_round
         simulated_hour = (simulated_minutes // 60) % 24
         simulated_day = simulated_minutes // (60 * 24) + 1
-        
+
         active_agents = get_active_agents_for_round(
             result.env, config, simulated_hour, round_num
         )
-        
+
         # 无论是否有活跃agent，都记录round开始
         if action_logger:
             action_logger.log_round_start(round_num + 1, simulated_hour)
-        
+
         if not active_agents:
             # 没有活跃agent时也记录round结束（actions_count=0）
+            # 注意：这是「本轮时间表上没有需要激活的 agent」，与 LLM 失败无关，不计入熔断
             if action_logger:
                 action_logger.log_round_end(round_num + 1, 0)
             continue
-        
+
         actions = {agent: LLMAction() for _, agent in active_agents}
         await result.env.step(actions)
-        
+
         # 从数据库获取实际执行的动作并记录
         actual_actions, last_rowid = fetch_new_actions_from_db(
             db_path, last_rowid, agent_names
         )
-        
+
         round_action_count = 0
         for action_data in actual_actions:
             if action_logger:
@@ -1540,14 +1692,40 @@ async def run_reddit_simulation(
                 )
                 total_actions += 1
                 round_action_count += 1
-        
+
+        # 每个活跃 agent 每轮至多产生一个动作（含 DO_NOTHING），所以「活跃数 - 实际动作数」
+        # 就是本轮 LLM 调用失败（或未产生有效工具调用）的 agent 数，精确且天然按平台隔离
+        round_fail_count = max(len(active_agents) - round_action_count, 0)
+
+        # 尽力而为地把本轮期间 OASIS 内部捕获到的原始 LLM 错误文本节流写入主日志
+        # （诊断用，双平台并发时无法保证 100% 归属到本平台，见 report_agent_errors 说明）
+        if round_fail_count > 0:
+            report_agent_errors(log_info)
+
         if action_logger:
-            action_logger.log_round_end(round_num + 1, round_action_count)
-        
+            action_logger.log_round_end(round_num + 1, round_action_count, round_fail_count)
+
+        # LLM 熔断判定：连续 N 轮「有活跃 agent 但零动作」
+        if round_action_count == 0 and round_fail_count > 0:
+            consecutive_zero_action_rounds += 1
+        else:
+            consecutive_zero_action_rounds = 0
+
+        if consecutive_zero_action_rounds >= CONSECUTIVE_ZERO_ACTION_ROUNDS_LIMIT:
+            _platform_tag = "Twitter" if "twitter" in str(log_info) else "Reddit"
+            abort_msg = (
+                f"连续 {consecutive_zero_action_rounds} 轮所有 agent 动作失败，"
+                f"疑似 LLM 配额耗尽，模拟已中止"
+            )
+            log_info(abort_msg)
+            if main_logger:
+                main_logger.error(f"[{_platform_tag}] {abort_msg}")
+            sys.exit(1)
+
         if (round_num + 1) % 20 == 0:
             progress = (round_num + 1) / total_rounds * 100
             log_info(f"Day {simulated_day}, {simulated_hour:02d}:00 - Round {round_num + 1}/{total_rounds} ({progress:.1f}%)")
-        
+
         # 轻量 checkpoint（每 N 轮）
         ckpt_interval = int(os.environ.get('SIM_CHECKPOINT_INTERVAL', '5'))
         if ckpt_interval > 0 and (round_num + 1) % ckpt_interval == 0:
@@ -1789,12 +1967,16 @@ def setup_signal_handlers(loop=None):
 
 if __name__ == "__main__":
     setup_signal_handlers()
+    # 保留原有的“不让 SystemExit 打印吓人的 traceback”行为，但不再把退出码悄悄丢弃成 0——
+    # 否则 preflight_check_llm / 熔断机制里的 sys.exit(1) 会被这里吞掉，父进程
+    # （simulation_runner.py）看到 exit_code == 0 就会把失败的模拟误判为成功完成。
+    _exit_code = 0
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
         print("\n程序被中断")
-    except SystemExit:
-        pass
+    except SystemExit as e:
+        _exit_code = e.code if isinstance(e.code, int) else 1
     finally:
         # 清理 multiprocessing 资源跟踪器（防止退出时的警告）
         try:
@@ -1803,3 +1985,4 @@ if __name__ == "__main__":
         except Exception:
             pass
         print("模拟进程已退出")
+    sys.exit(_exit_code)

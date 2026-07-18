@@ -27,7 +27,7 @@
             </span>
             <span class="stat">
               <span class="stat-label">ACTS</span>
-              <span class="stat-value mono">{{ runStatus.twitter_actions_count || 0 }}</span>
+              <span class="stat-value mono" :class="{ 'stat-warning': twitterZeroActionsWarning }">{{ runStatus.twitter_actions_count || 0 }}</span>
             </span>
           </div>
           <!-- 可用动作提示 -->
@@ -43,7 +43,7 @@
             </div>
           </div>
         </div>
-        
+
         <!-- Reddit 平台进度 -->
         <div class="platform-status reddit" :class="{ active: runStatus.reddit_running, completed: runStatus.reddit_completed }">
           <div class="platform-header">
@@ -68,7 +68,7 @@
             </span>
             <span class="stat">
               <span class="stat-label">ACTS</span>
-              <span class="stat-value mono">{{ runStatus.reddit_actions_count || 0 }}</span>
+              <span class="stat-value mono" :class="{ 'stat-warning': redditZeroActionsWarning }">{{ runStatus.reddit_actions_count || 0 }}</span>
             </span>
           </div>
           <!-- 可用动作提示 -->
@@ -281,9 +281,17 @@
           </div>
         </TransitionGroup>
 
-        <div v-if="allActions.length === 0" class="waiting-state">
+        <div v-if="allActions.length === 0 && phase !== 2" class="waiting-state">
           <div class="pulse-ring"></div>
-          <span>Waiting for AI Agent actions...</span>
+          <span>{{ $t('step3.waitingForActions') }}</span>
+        </div>
+
+        <!-- 模拟已结束（完成或中止）但零动作：明确空状态，而非继续显示「等待中」 -->
+        <div v-else-if="allActions.length === 0 && phase === 2" class="empty-finished-state">
+          <span class="empty-finished-icon">⚠</span>
+          <span class="empty-finished-title">{{ $t('step3.zeroActionsTitle') }}</span>
+          <span class="empty-finished-desc">{{ $t('step3.zeroActionsDesc') }}</span>
+          <span v-if="runStatus.error" class="empty-finished-reason">{{ runStatus.error }}</span>
         </div>
       </div>
     </div>
@@ -385,6 +393,15 @@ const twitterElapsedTime = computed(() => {
 // Reddit平台的模拟流逝时间
 const redditElapsedTime = computed(() => {
   return formatElapsedTime(runStatus.value.reddit_current_round || 0)
+})
+
+// 模拟已结束（完成或中止）但该平台零动作：ACTS 用警示色提示异常，而非看起来一切正常
+const twitterZeroActionsWarning = computed(() => {
+  return phase.value === 2 && !runStatus.value.twitter_actions_count
+})
+
+const redditZeroActionsWarning = computed(() => {
+  return phase.value === 2 && !runStatus.value.reddit_actions_count
 })
 
 // Methods
@@ -594,12 +611,12 @@ const fetchRunStatus = async () => {
       
       // 分别检测各平台的轮次变化并输出日志
       if (data.twitter_current_round > prevTwitterRound.value) {
-        addLog(`[Plaza] R${data.twitter_current_round}/${data.total_rounds} | T:${data.twitter_simulated_hours || 0}h | A:${data.twitter_actions_count}`)
+        addLog(`[Plaza] R${data.twitter_current_round}/${data.total_rounds} | T:${data.twitter_simulated_hours || 0}h | A:${data.twitter_actions_count} | F:${data.twitter_failed_count || 0}`)
         prevTwitterRound.value = data.twitter_current_round
       }
-      
+
       if (data.reddit_current_round > prevRedditRound.value) {
-        addLog(`[Community] R${data.reddit_current_round}/${data.total_rounds} | T:${data.reddit_simulated_hours || 0}h | A:${data.reddit_actions_count}`)
+        addLog(`[Community] R${data.reddit_current_round}/${data.total_rounds} | T:${data.reddit_simulated_hours || 0}h | A:${data.reddit_actions_count} | F:${data.reddit_failed_count || 0}`)
         prevRedditRound.value = data.reddit_current_round
       }
       
@@ -974,6 +991,12 @@ onUnmounted(() => {
   color: #333;
 }
 
+/* 模拟已结束但该平台零动作时的警示色（异常，而非正常完成） */
+.stat-value.stat-warning {
+  color: #D64545;
+  font-weight: 700;
+}
+
 .stat-total, .stat-unit {
   font-size: 9px;
   color: #999;
@@ -1309,6 +1332,52 @@ onUnmounted(() => {
 @keyframes ripple {
   0% { transform: scale(0.8); opacity: 1; border-color: #CCC; }
   100% { transform: scale(2.5); opacity: 0; border-color: #EAEAEA; }
+}
+
+/* 模拟已结束但零动作的明确空状态（与 waiting-state 区分：不再是「等待中」的中性提示） */
+.empty-finished-state {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 420px;
+  padding: 24px 32px;
+  text-align: center;
+}
+
+.empty-finished-icon {
+  font-size: 28px;
+  color: #E67700;
+}
+
+.empty-finished-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #333;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.empty-finished-desc {
+  font-size: 12px;
+  color: #777;
+  line-height: 1.6;
+}
+
+.empty-finished-reason {
+  margin-top: 8px;
+  padding: 8px 12px;
+  background: #FFF5F0;
+  border: 1px solid #FFD8B8;
+  border-radius: 4px;
+  font-size: 11px;
+  color: #B45309;
+  font-family: 'JetBrains Mono', monospace;
+  word-break: break-word;
 }
 
 /* Animation */
