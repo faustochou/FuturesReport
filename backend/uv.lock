@@ -6,6 +6,9 @@ resolution-markers = [
     "python_full_version < '3.12'",
 ]
 
+[manifest]
+overrides = [{ name = "neo4j", specifier = ">=5.26.0" }]
+
 [[package]]
 name = "aiofiles"
 version = "25.1.0"
@@ -552,6 +555,19 @@ wheels = [
 ]
 
 [[package]]
+name = "falkordb"
+version = "1.2.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "python-dateutil" },
+    { name = "redis" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/c6/9f/d02f8282490b525ff6a05024ce23e2f519d3fc3dbd6cb2f004ab1bae4920/falkordb-1.2.2.tar.gz", hash = "sha256:3fc150d3262b971916a0f2c15f419f7fe521a94fe3a672b6f174288d885fd239", size = 30179, upload-time = "2025-12-07T13:29:53.746Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/56/5e79a1a3ed0afa4c8e32a99edb862f1d2ab66b7dc65a35fd638ea157f33d/falkordb-1.2.2-py3-none-any.whl", hash = "sha256:cc1fcccaa1148be9e3d22d85af03d027f19b398e0f38d04424f3757a02744976", size = 36046, upload-time = "2025-12-07T13:29:52.686Z" },
+]
+
+[[package]]
 name = "fastjsonschema"
 version = "2.21.2"
 source = { registry = "https://pypi.org/simple" }
@@ -620,7 +636,7 @@ wheels = [
 [[package]]
 name = "futuresreport-backend"
 version = "0.1.0"
-source = { editable = "." }
+source = { virtual = "." }
 dependencies = [
     { name = "alembic" },
     { name = "camel-ai" },
@@ -628,8 +644,10 @@ dependencies = [
     { name = "celery", extra = ["redis"] },
     { name = "chardet" },
     { name = "charset-normalizer" },
+    { name = "cryptography" },
     { name = "flask" },
     { name = "flask-cors" },
+    { name = "graphiti-core", extra = ["falkordb", "google-genai"] },
     { name = "openai" },
     { name = "psutil" },
     { name = "psycopg2-binary" },
@@ -639,7 +657,6 @@ dependencies = [
     { name = "redis" },
     { name = "sqlalchemy" },
     { name = "stripe" },
-    { name = "zep-cloud" },
 ]
 
 [package.optional-dependencies]
@@ -663,8 +680,10 @@ requires-dist = [
     { name = "celery", extras = ["redis"], specifier = ">=5.3.0" },
     { name = "chardet", specifier = ">=5.0.0" },
     { name = "charset-normalizer", specifier = ">=3.0.0" },
+    { name = "cryptography", specifier = ">=42.0.0" },
     { name = "flask", specifier = ">=3.0.0" },
     { name = "flask-cors", specifier = ">=6.0.0" },
+    { name = "graphiti-core", extras = ["falkordb", "google-genai"], specifier = ">=0.29.0" },
     { name = "openai", specifier = ">=1.0.0" },
     { name = "pipreqs", marker = "extra == 'dev'", specifier = ">=0.5.0" },
     { name = "psutil", specifier = ">=5.9.0" },
@@ -677,7 +696,6 @@ requires-dist = [
     { name = "redis", specifier = ">=5.0.0" },
     { name = "sqlalchemy", specifier = ">=2.0.0" },
     { name = "stripe", specifier = ">=10.0.0" },
-    { name = "zep-cloud", specifier = "==3.13.0" },
 ]
 provides-extras = ["dev"]
 
@@ -685,6 +703,71 @@ provides-extras = ["dev"]
 dev = [
     { name = "pytest", specifier = ">=8.0.0" },
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
+]
+
+[[package]]
+name = "google-auth"
+version = "2.55.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "pyasn1-modules" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/79/b9/e370d86fea3da13ec0256df30323dd26c0cb9c8c85f0c6ec42ac9df0106b/google_auth-2.55.2.tar.gz", hash = "sha256:97ae7790ff740f2bc9db60eb864a7804f4ac19f5f02c38b3d942f2fea6e9b9ae", size = 361414, upload-time = "2026-07-07T18:43:21.227Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1e/c6/02eb5a337ac316a4c30c012e747bad5cea36e1a876efecdf80865541f7d8/google_auth-2.55.2-py3-none-any.whl", hash = "sha256:d715f265f2cafc6a5f1bf0dc19870d20e3119f6f6682785a250bce3d03d38a3b", size = 256778, upload-time = "2026-07-07T18:43:19.52Z" },
+]
+
+[package.optional-dependencies]
+requests = [
+    { name = "requests" },
+]
+
+[[package]]
+name = "google-genai"
+version = "2.12.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "anyio" },
+    { name = "distro" },
+    { name = "google-auth", extra = ["requests"] },
+    { name = "httpx" },
+    { name = "pydantic" },
+    { name = "requests" },
+    { name = "sniffio" },
+    { name = "tenacity" },
+    { name = "typing-extensions" },
+    { name = "websockets" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/96/59/9ea84cbeb8f09694564d3b0ee9dd59003551b308d47b61f251415df93982/google_genai-2.12.1.tar.gz", hash = "sha256:78c25217885d63dc430ca7c4526853512b164a25a93a8a0d0af5b85971aa1db0", size = 636710, upload-time = "2026-07-16T16:15:02.035Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/b6/b4/1369fb413fc2ba7f78acace5590b6e9990c52ab5d1d166aafaa1ae2c28c8/google_genai-2.12.1-py3-none-any.whl", hash = "sha256:686d5ec39bda345151d3ed1bac3915f01f49138b1ea519af2eb98f11cc55ebc4", size = 1023403, upload-time = "2026-07-16T16:14:59.79Z" },
+]
+
+[[package]]
+name = "graphiti-core"
+version = "0.29.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "neo4j" },
+    { name = "numpy" },
+    { name = "openai" },
+    { name = "posthog" },
+    { name = "pydantic" },
+    { name = "python-dotenv" },
+    { name = "tenacity" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ce/3a/a59990224ec20d054f1597050298a112982c638b755c9b77a7cdb2b572fc/graphiti_core-0.29.2.tar.gz", hash = "sha256:dd746a2546abfe5ff9025f088f4793a027bce949e044762cb2ea3ec8f1db8e63", size = 6944531, upload-time = "2026-06-08T14:26:07.717Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a6/c0/cc379ce0e6c54c2224886962ff78b3de9983a3f66dd27708f840d2681847/graphiti_core-0.29.2-py3-none-any.whl", hash = "sha256:536780d1dd5d2e16f50fcc75b29bc1c2f2a53e5d651fb49482c43b7d8c2841d5", size = 357991, upload-time = "2026-06-08T14:26:05.532Z" },
+]
+
+[package.optional-dependencies]
+falkordb = [
+    { name = "falkordb" },
+]
+google-genai = [
+    { name = "google-genai" },
 ]
 
 [[package]]
@@ -1299,14 +1382,14 @@ wheels = [
 
 [[package]]
 name = "neo4j"
-version = "5.23.0"
+version = "6.2.0"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "pytz" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/e1/14/86f149430f2e6ffe63f5726951720b7cf4136ee1676eb077c4ade94959df/neo4j-5.23.0.tar.gz", hash = "sha256:26b06dac3a4b93d882a61714c5ca8d06fe68f697cbdfe113ab840d651a2d46a2", size = 215255, upload-time = "2024-07-29T10:22:29.973Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/ce/f4/aaa4ac19adae4b01bc742b63afd2672a77e7351566f02721e713e4b863ee/neo4j-6.2.0.tar.gz", hash = "sha256:e1e246b65b572bd8ea97f9e0e721b7d40a5ce53e53d0007c29aef63e4f9124d9", size = 241459, upload-time = "2026-05-04T07:35:41.428Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/6f/10/0feaa10a342f5c06ffc5bfe3e5e52a9950094186889208251de39092237b/neo4j-5.23.0-py3-none-any.whl", hash = "sha256:5d8d2f45227c12d6ba564720cbc3e2f57aac472e4fa14fe69270e4f952791020", size = 293671, upload-time = "2024-07-29T10:22:24.874Z" },
+    { url = "https://files.pythonhosted.org/packages/e6/cf/1c3795866cefaac6e648d4e98c373cafd97810f6e317c307371007ab4abb/neo4j-6.2.0-py3-none-any.whl", hash = "sha256:b87abdd13a5cc2e3bd51026926c2f20ac38fa3febe98c340520dce19e97388d0", size = 327824, upload-time = "2026-05-04T07:35:39.604Z" },
 ]
 
 [[package]]
@@ -1719,6 +1802,21 @@ wheels = [
 ]
 
 [[package]]
+name = "posthog"
+version = "7.26.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "backoff" },
+    { name = "distro" },
+    { name = "requests" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/b2/bb/e8a543c4ba34f830be6e1a6fa6bcfe2b1366aabe480212fa2dba3f0941f0/posthog-7.26.0.tar.gz", hash = "sha256:9b31576acfabfa10f197ed23d3928f39178cd04d5b8c8193cad9780a315ffa55", size = 346939, upload-time = "2026-07-17T12:53:11.155Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/4a/113c96eb15df3599bac192c7acc2324fdc92174018cde3a2a424e4b406f3/posthog-7.26.0-py3-none-any.whl", hash = "sha256:9a4bb3f62cd544b14d26d4d974aeb0937a75f60ad53cd2e520f56595eb57f851", size = 414806, upload-time = "2026-07-17T12:53:09.69Z" },
+]
+
+[[package]]
 name = "prance"
 version = "23.6.21.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1822,6 +1920,27 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/cd/05/0a34433a064256a578f1783a10da6df098ceaa4a57bbeaa96a6c0352786b/pure_eval-0.2.3.tar.gz", hash = "sha256:5f4e983f40564c576c7c8635ae88db5956bb2229d7e9237d03b3c0b0190eaf42", size = 19752, upload-time = "2024-07-21T12:58:21.801Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8e/37/efad0257dc6e593a18957422533ff0f87ede7c9c6ea010a2177d738fb82f/pure_eval-0.2.3-py3-none-any.whl", hash = "sha256:1db8e35b67b3d218d818ae653e27f06c3aa420901fa7b081ca98cbedc874e0d0", size = 11842, upload-time = "2024-07-21T12:58:20.04Z" },
+]
+
+[[package]]
+name = "pyasn1"
+version = "0.6.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/a4/9a/23310166d960def5897e91fe20e5b724601b02a22e84ba1f94232c0b7f67/pyasn1-0.6.4.tar.gz", hash = "sha256:9c447d8431c947fe4c8febc4ed9e760bc29011a5b01e5c74b67025bd9fb8ce81", size = 151262, upload-time = "2026-07-09T01:12:33.988Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/9a/3b/6163796d69c3977d1e4287bea4a6979161cbbdd170ebb430511e8e1999ce/pyasn1-0.6.4-py3-none-any.whl", hash = "sha256:deda9277cfd454080ec40b207fb6df82206a3a2688735233cdcd8d3d565f088b", size = 84410, upload-time = "2026-07-09T01:12:32.92Z" },
+]
+
+[[package]]
+name = "pyasn1-modules"
+version = "0.4.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "pyasn1" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/e9/e6/78ebbb10a8c8e4b61a59249394a4a594c1a7af95593dc933a349c8d00964/pyasn1_modules-0.4.2.tar.gz", hash = "sha256:677091de870a80aae844b1ca6134f54652fa2c8c5a52aa396440ac3106e941e6", size = 307892, upload-time = "2025-03-28T02:41:22.17Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/47/8d/d529b5d697919ba8c11ad626e835d4039be708a35b0d22de83a269a6682c/pyasn1_modules-0.4.2-py3-none-any.whl", hash = "sha256:29253a9207ce32b64c3ac6600edc75368f98473906e8fd1043bd6b5b1de2c14a", size = 181259, upload-time = "2025-03-28T02:41:19.028Z" },
 ]
 
 [[package]]
@@ -2608,6 +2727,15 @@ wheels = [
 ]
 
 [[package]]
+name = "tenacity"
+version = "9.1.4"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/47/c6/ee486fd809e357697ee8a44d3d69222b344920433d3b6666ccd9b374630c/tenacity-9.1.4.tar.gz", hash = "sha256:adb31d4c263f2bd041081ab33b498309a57c77f9acf2db65aadf0898179cf93a", size = 49413, upload-time = "2026-02-07T10:45:33.841Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d7/c1/eb8f9debc45d3b7918a32ab756658a0904732f75e555402972246b0b8e71/tenacity-9.1.4-py3-none-any.whl", hash = "sha256:6095a360c919085f28c6527de529e76a06ad89b23659fa881ae0649b867a9d55", size = 28926, upload-time = "2026-02-07T10:45:32.24Z" },
+]
+
+[[package]]
 name = "texttable"
 version = "1.7.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3049,20 +3177,4 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/d4/c8/cc640404a0981e6c14e2044fc64e43b4c1ddf69e7dddc8f2a02638ba5ae8/yarg-0.1.9.tar.gz", hash = "sha256:55695bf4d1e3e7f756496c36a69ba32c40d18f821e38f61d028f6049e5e15911", size = 11988, upload-time = "2014-08-11T22:01:37.243Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/90/89a2ff242ccab6a24fbab18dbbabc67c51a6f0ed01f9a0f41689dc177419/yarg-0.1.9-py2.py3-none-any.whl", hash = "sha256:4f9cebdc00fac946c9bf2783d634e538a71c7d280a4d806d45fd4dc0ef441492", size = 19162, upload-time = "2014-08-11T22:01:41.104Z" },
-]
-
-[[package]]
-name = "zep-cloud"
-version = "3.13.0"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "httpx" },
-    { name = "pydantic" },
-    { name = "pydantic-core" },
-    { name = "python-dateutil" },
-    { name = "typing-extensions" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/32/c7/c835debf13302f8aaf8d0561ac6ff5a9bc15cc140cd692a1330fb1900c55/zep_cloud-3.13.0.tar.gz", hash = "sha256:c55d9c511773bb2177ae8e08546141404f87d2099affafabd7ec4b4505763e48", size = 63116, upload-time = "2025-11-20T15:25:40.745Z" }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/f7/e1/bbf03c6c8007c0cb238780e7fc6d8e1a52633893933a41aa09678618985a/zep_cloud-3.13.0-py3-none-any.whl", hash = "sha256:b2fbdeef73e262194c8f67b58f76471de6ee87e1a629541a09d8f7bbf475f12b", size = 110601, upload-time = "2025-11-20T15:25:38.484Z" },
 ]

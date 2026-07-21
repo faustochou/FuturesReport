@@ -1,23 +1,58 @@
 """
 图谱构建服务
-接口2：使用Zep API构建Standalone Graph
+接口2：使用 Graphiti + FalkorDB 构建 Standalone Graph（BYOK：LLM/embedding 用使用者自己的模型）
 """
 
+import asyncio
 import os
 import uuid
-import time
-import threading
+from datetime import datetime, timezone
 from typing import Dict, Any, List, Optional, Callable
 from dataclasses import dataclass
 
-from zep_cloud.client import Zep
-from zep_cloud import EpisodeData, EntityEdgeSourceTarget
+from falkordb.asyncio import FalkorDB
+from graphiti_core.driver.falkordb_driver import FalkorDriver
+from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutError as RedisTimeoutError
 
-from ..config import Config
 from ..models.task import TaskManager, TaskStatus
-from ..utils.zep_paging import fetch_all_nodes, fetch_all_edges
-from .text_processor import TextProcessor
+from ..utils.zep_paging import fetch_nodes_and_edges
 from ..utils.locale import t, get_locale, set_locale
+from ..utils.logger import get_logger
+from .text_processor import TextProcessor
+from .graphiti_factory import (
+    build_graphiti,
+    precheck_llm,
+    enforce_embedding_consistency,
+    get_embedding_identity,
+    redact_secrets,
+    UnsupportedProviderError,
+    EmbeddingMismatchError,
+    DEFAULT_FALKORDB_HOST,
+    DEFAULT_FALKORDB_PORT,
+    FALKORDB_SOCKET_CONNECT_TIMEOUT,
+    FALKORDB_SOCKET_TIMEOUT,
+)
+from .graphiti_ontology import convert_ontology
+
+logger = get_logger('futuresreport.graph_builder')
+
+# 原本這裡有一個進程級旗標 `_indices_built`，假設「FalkorDB 的索引是 label 級的，
+# 跨所有 group_id 共用」，只在進程生命週期內成功建過一次索引就永遠跳過。這個假設
+# 是錯的：Stage 5 對真實 FalkorDB 實測直接驗證過——對從沒呼叫過
+# build_indices_and_constraints() 的圖譜跑 `CALL DB.INDEXES()` 回傳 0 筆，對呼叫過的
+# 圖譜回傳 9 筆，證明索引是逐資料庫（逐 graph_id）的，不是全域共用。用單一布林旗標
+# 的後果：同一個後端行程裡，第一個成功建圖的 graph_id 之後，其餘所有 graph_id
+# 永遠不會真的建立索引（不會報錯，只是靜默退化成無索引全掃描，效能下降，且不易
+# 察覺）。
+#
+# 修法：拿掉快取旗標，改成每次建圖都直接呼叫 build_indices_and_constraints()——
+# 同樣用 Stage 5 對真實 FalkorDB 實測驗證過這是冪等操作：對同一個 database 連續
+# 呼叫兩次、甚至換一個全新的 driver 實例再呼叫第三次，均未拋出例外（背後原因是
+# graphiti-core 的 FalkorDriver.execute_query() 自己會攔截 'already indexed' 字樣的
+# 例外訊息、當成無害情況吞掉並回傳 None，不會往外拋）。既然已確認冪等且成本低
+# （索引已存在時，每個查詢就是一次快速的「已存在」回應），比起維護一個容易踩錯的
+# 快取旗標，直接每次都呼叫更簡單、也更正確——下方 try/except 保留下來只是防禦
+# 真正的連線類例外（非「已存在」情況），不是為了掩蓋索引重複建立的錯誤。
 
 
 @dataclass
@@ -27,7 +62,7 @@ class GraphInfo:
     node_count: int
     edge_count: int
     entity_types: List[str]
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "graph_id": self.graph_id,
@@ -40,17 +75,26 @@ class GraphInfo:
 class GraphBuilderService:
     """
     图谱构建服务
-    负责调用Zep API构建知识图谱
+    负责用使用者的 BYOK LLM 设定组装 Graphiti，对 FalkorDB 构建知识图谱
+
+    与旧版 Zep 实现的关键差异：
+    - 没有「等待 episode 处理完成」的概念——add_episode() 是同步完成抽取的
+      （每次调用内部就跑完 LLM 抽取 + 写图），不像 Zep 那样是先排队、后台异步处理、
+      需要轮询 processed 状态。所以这里没有 _wait_for_episodes()。
+    - 每个 chunk 各自一次 add_episode() 调用，进度回调直接对应每个 chunk 完成，
+      不再有「发送完成」与「处理完成」两段式进度。
     """
-    
-    def __init__(self, api_key: Optional[str] = None):
-        self.api_key = api_key or Config.ZEP_API_KEY
-        if not self.api_key:
-            raise ValueError("ZEP_API_KEY 未配置")
-        
-        self.client = Zep(api_key=self.api_key)
+
+    def __init__(self, user_llm_config: Dict[str, str]):
+        if not user_llm_config or not user_llm_config.get("api_key"):
+            raise ValueError(t('api.llmConfigMissing'))
+        self.user_llm_config = user_llm_config
         self.task_manager = TaskManager()
-    
+
+    def precheck(self) -> tuple:
+        """建圖前的 LLM 可用性預檢（結構化輸出 + embedding）。回傳 (ok, reason)。"""
+        return asyncio.run(precheck_llm(self.user_llm_config))
+
     def build_graph_async(
         self,
         text: str,
@@ -60,21 +104,7 @@ class GraphBuilderService:
         chunk_overlap: int = 50,
         batch_size: int = 3
     ) -> str:
-        """
-        异步构建图谱
-        
-        Args:
-            text: 输入文本
-            ontology: 本体定义（来自接口1的输出）
-            graph_name: 图谱名称
-            chunk_size: 文本块大小
-            chunk_overlap: 块重叠大小
-            batch_size: 每批发送的块数量
-            
-        Returns:
-            任务ID
-        """
-        # 创建任务
+        """异步构建图谱"""
         task_id = self.task_manager.create_task(
             task_type="graph_build",
             metadata={
@@ -83,20 +113,19 @@ class GraphBuilderService:
                 "text_length": len(text),
             }
         )
-        
-        # Capture locale before spawning background thread
+
         current_locale = get_locale()
 
-        # 在后台线程中执行构建
+        import threading
         thread = threading.Thread(
             target=self._build_graph_worker,
             args=(task_id, text, ontology, graph_name, chunk_size, chunk_overlap, batch_size, current_locale)
         )
         thread.daemon = True
         thread.start()
-        
+
         return task_id
-    
+
     def _build_graph_worker(
         self,
         task_id: str,
@@ -117,24 +146,21 @@ class GraphBuilderService:
                 progress=5,
                 message=t('progress.startBuildingGraph')
             )
-            
-            # 1. 创建图谱
+
             graph_id = self.create_graph(graph_name)
             self.task_manager.update_task(
                 task_id,
                 progress=10,
                 message=t('progress.graphCreated', graphId=graph_id)
             )
-            
-            # 2. 设置本体
+
             self.set_ontology(graph_id, ontology)
             self.task_manager.update_task(
                 task_id,
                 progress=15,
                 message=t('progress.ontologySet')
             )
-            
-            # 3. 文本分块
+
             chunks = TextProcessor.split_text(text, chunk_size, chunk_overlap)
             total_chunks = len(chunks)
             self.task_manager.update_task(
@@ -142,273 +168,138 @@ class GraphBuilderService:
                 progress=20,
                 message=t('progress.textSplit', count=total_chunks)
             )
-            
-            # 4. 分批发送数据
-            episode_uuids = self.add_text_batches(
-                graph_id, chunks, batch_size,
+
+            self.add_text_batches(
+                graph_id, chunks, ontology, batch_size,
                 lambda msg, prog: self.task_manager.update_task(
                     task_id,
-                    progress=20 + int(prog * 0.4),  # 20-60%
+                    progress=20 + int(prog * 0.7),  # 20-90%
                     message=msg
                 )
             )
-            
-            # 5. 等待Zep处理完成
-            self.task_manager.update_task(
-                task_id,
-                progress=60,
-                message=t('progress.waitingZepProcess')
-            )
-            
-            self._wait_for_episodes(
-                episode_uuids,
-                lambda msg, prog: self.task_manager.update_task(
-                    task_id,
-                    progress=60 + int(prog * 0.3),  # 60-90%
-                    message=msg
-                )
-            )
-            
-            # 6. 获取图谱信息
+
             self.task_manager.update_task(
                 task_id,
                 progress=90,
                 message=t('progress.fetchingGraphInfo')
             )
-            
+
             graph_info = self._get_graph_info(graph_id)
-            
-            # 完成
+
             self.task_manager.complete_task(task_id, {
                 "graph_id": graph_id,
                 "graph_info": graph_info.to_dict(),
                 "chunks_processed": total_chunks,
             })
-            
+
         except Exception as e:
             import traceback
-            error_msg = f"{str(e)}\n{traceback.format_exc()}"
+            error_msg = f"{redact_secrets(str(e))}\n{redact_secrets(traceback.format_exc())}"
             self.task_manager.fail_task(task_id, error_msg)
-    
+
     def create_graph(self, name: str) -> str:
-        """创建Zep图谱（公开方法）"""
-        graph_id = f"fr_{uuid.uuid4().hex[:16]}"
-        
-        self.client.graph.create(
-            graph_id=graph_id,
-            name=name,
-            description="Futures Report Social Simulation Graph"
-        )
-        
-        return graph_id
-    
-    def set_ontology(self, graph_id: str, ontology: Dict[str, Any]):
-        """设置图谱本体（公开方法）"""
-        import warnings
-        from typing import Optional
-        from pydantic import Field
-        from zep_cloud.external_clients.ontology import EntityModel, EntityText, EdgeModel
-        
-        # 抑制 Pydantic v2 关于 Field(default=None) 的警告
-        # 这是 Zep SDK 要求的用法，警告来自动态类创建，可以安全忽略
-        warnings.filterwarnings('ignore', category=UserWarning, module='pydantic')
-        
-        # Zep 保留名称，不能作为属性名
-        RESERVED_NAMES = {'uuid', 'name', 'group_id', 'name_embedding', 'summary', 'created_at'}
-        
-        def safe_attr_name(attr_name: str) -> str:
-            """将保留名称转换为安全名称"""
-            if attr_name.lower() in RESERVED_NAMES:
-                return f"entity_{attr_name}"
-            return attr_name
-        
-        # 动态创建实体类型
-        entity_types = {}
-        for entity_def in ontology.get("entity_types", []):
-            name = entity_def["name"]
-            description = entity_def.get("description", f"A {name} entity.")
-            
-            # 创建属性字典和类型注解（Pydantic v2 需要）
-            attrs = {"__doc__": description}
-            annotations = {}
-            
-            for attr_def in entity_def.get("attributes", []):
-                attr_name = safe_attr_name(attr_def["name"])  # 使用安全名称
-                attr_desc = attr_def.get("description", attr_name)
-                # Zep API 需要 Field 的 description，这是必需的
-                attrs[attr_name] = Field(description=attr_desc, default=None)
-                annotations[attr_name] = Optional[EntityText]  # 类型注解
-            
-            attrs["__annotations__"] = annotations
-            
-            # 动态创建类
-            entity_class = type(name, (EntityModel,), attrs)
-            entity_class.__doc__ = description
-            entity_types[name] = entity_class
-        
-        # 动态创建边类型
-        edge_definitions = {}
-        for edge_def in ontology.get("edge_types", []):
-            name = edge_def["name"]
-            description = edge_def.get("description", f"A {name} relationship.")
-            
-            # 创建属性字典和类型注解
-            attrs = {"__doc__": description}
-            annotations = {}
-            
-            for attr_def in edge_def.get("attributes", []):
-                attr_name = safe_attr_name(attr_def["name"])  # 使用安全名称
-                attr_desc = attr_def.get("description", attr_name)
-                # Zep API 需要 Field 的 description，这是必需的
-                attrs[attr_name] = Field(description=attr_desc, default=None)
-                annotations[attr_name] = Optional[str]  # 边属性用str类型
-            
-            attrs["__annotations__"] = annotations
-            
-            # 动态创建类
-            class_name = ''.join(word.capitalize() for word in name.split('_'))
-            edge_class = type(class_name, (EdgeModel,), attrs)
-            edge_class.__doc__ = description
-            
-            # 构建source_targets
-            source_targets = []
-            for st in edge_def.get("source_targets", []):
-                source_targets.append(
-                    EntityEdgeSourceTarget(
-                        source=st.get("source", "Entity"),
-                        target=st.get("target", "Entity")
-                    )
-                )
-            
-            if source_targets:
-                edge_definitions[name] = (edge_class, source_targets)
-        
-        # 调用Zep API设置本体
-        if entity_types or edge_definitions:
-            self.client.graph.set_ontology(
-                graph_ids=[graph_id],
-                entities=entity_types if entity_types else None,
-                edges=edge_definitions if edge_definitions else None,
-            )
-    
+        """创建图谱 ID（公开方法）。FalkorDB 本身不需要预先"创建"一个图谱容器——
+        group_id 是首次 add_episode 时才实际产生数据的逻辑分区，这里只是生成 ID。"""
+        return f"fr_{uuid.uuid4().hex[:16]}"
+
+    def set_ontology(self, graph_id: str, ontology: Dict[str, Any]) -> None:
+        """转换并缓存本体（公开方法，与旧版签名一致）。
+
+        Graphiti 没有「预先注册本体」的概念——entity_types/edge_types/edge_type_map
+        是每次 add_episode() 调用时传入的参数，不是像 Zep 那样先用一个 API 调用
+        设置到服务端。这里把转换结果缓存在实例上，供 add_text_batches 使用。
+        """
+        entity_types, edge_types, edge_type_map = convert_ontology(ontology)
+        self._entity_types = entity_types
+        self._edge_types = edge_types
+        self._edge_type_map = edge_type_map
+
     def add_text_batches(
         self,
         graph_id: str,
         chunks: List[str],
+        ontology: Optional[Dict[str, Any]] = None,
         batch_size: int = 3,
         progress_callback: Optional[Callable] = None
     ) -> List[str]:
-        """分批添加文本到图谱，返回所有 episode 的 uuid 列表"""
+        """逐个 chunk 调用 add_episode()，返回所有 episode 的 uuid 列表。
+
+        batch_size 参数保留是为了不打破既有调用签名，但 Graphiti 的 add_episode()
+        是逐条处理的（没有 Zep 那种批量提交 API），这里内部仍是一个个调用，
+        只是保留同样的「进度分批播报」节奏。
+        """
+        if ontology is not None and not hasattr(self, '_entity_types'):
+            self.set_ontology(graph_id, ontology)
+
+        entity_types = getattr(self, '_entity_types', {})
+        edge_types = getattr(self, '_edge_types', {})
+        edge_type_map = getattr(self, '_edge_type_map', {})
+
+        try:
+            graphiti = build_graphiti(self.user_llm_config, graph_id)
+        except UnsupportedProviderError:
+            raise
+        except (RedisConnectionError, RedisTimeoutError) as e:
+            raise RuntimeError(t('api.falkordbConnectionError', detail=redact_secrets(str(e)))) from e
+
         episode_uuids = []
         total_chunks = len(chunks)
-        
-        for i in range(0, total_chunks, batch_size):
-            batch_chunks = chunks[i:i + batch_size]
-            batch_num = i // batch_size + 1
-            total_batches = (total_chunks + batch_size - 1) // batch_size
-            
-            if progress_callback:
-                progress = (i + len(batch_chunks)) / total_chunks
-                progress_callback(
-                    t('progress.sendingBatch', current=batch_num, total=total_batches, chunks=len(batch_chunks)),
-                    progress
-                )
-            
-            # 构建episode数据
-            episodes = [
-                EpisodeData(data=chunk, type="text")
-                for chunk in batch_chunks
-            ]
-            
-            # 发送到Zep
+
+        async def _add_all():
             try:
-                batch_result = self.client.graph.add_batch(
-                    graph_id=graph_id,
-                    episodes=episodes
-                )
-                
-                # 收集返回的 episode uuid
-                if batch_result and isinstance(batch_result, list):
-                    for ep in batch_result:
-                        ep_uuid = getattr(ep, 'uuid_', None) or getattr(ep, 'uuid', None)
-                        if ep_uuid:
-                            episode_uuids.append(ep_uuid)
-                
-                # 避免请求过快
-                time.sleep(1)
-                
+                await graphiti.build_indices_and_constraints()
             except Exception as e:
-                if progress_callback:
-                    progress_callback(t('progress.batchFailed', batch=batch_num, error=str(e)), 0)
-                raise
-        
-        return episode_uuids
-    
-    def _wait_for_episodes(
-        self,
-        episode_uuids: List[str],
-        progress_callback: Optional[Callable] = None,
-        timeout: int = 600
-    ):
-        """等待所有 episode 处理完成（通过查询每个 episode 的 processed 状态）"""
-        if not episode_uuids:
-            if progress_callback:
-                progress_callback(t('progress.noEpisodesWait'), 1.0)
-            return
-        
-        start_time = time.time()
-        pending_episodes = set(episode_uuids)
-        completed_count = 0
-        total_episodes = len(episode_uuids)
-        
-        if progress_callback:
-            progress_callback(t('progress.waitingEpisodes', count=total_episodes), 0)
-        
-        while pending_episodes:
-            if time.time() - start_time > timeout:
-                if progress_callback:
-                    progress_callback(
-                        t('progress.episodesTimeout', completed=completed_count, total=total_episodes),
-                        completed_count / total_episodes
-                    )
-                break
-            
-            # 检查每个 episode 的处理状态
-            for ep_uuid in list(pending_episodes):
+                # 已确认冪等（见上方模块级注释），这里只防御真正的连线类例外；
+                # 真正的连线问题也会在下面的 add_episode 调用中作为
+                # RedisConnectionError 浮现并中断整个建图流程，这里不需要重复处理，
+                # 记 debug 日志即可，不影响本次建图继续往下走。
+                logger.debug(f"build_indices_and_constraints failed (non-fatal, continuing): {redact_secrets(str(e))}")
+
+            for i, chunk in enumerate(chunks):
                 try:
-                    episode = self.client.graph.episode.get(uuid_=ep_uuid)
-                    is_processed = getattr(episode, 'processed', False)
-                    
-                    if is_processed:
-                        pending_episodes.remove(ep_uuid)
-                        completed_count += 1
-                        
+                    result = await graphiti.add_episode(
+                        name=f"{graph_id}_chunk_{i}",
+                        episode_body=chunk,
+                        source_description="Futures Report document chunk",
+                        reference_time=datetime.now(timezone.utc),
+                        group_id=graph_id,
+                        entity_types=entity_types or None,
+                        edge_types=edge_types or None,
+                        edge_type_map=edge_type_map or None,
+                    )
+                    episode_uuids.append(result.episode.uuid)
+                except (RedisConnectionError, RedisTimeoutError):
+                    raise
                 except Exception as e:
-                    # 忽略单个查询错误，继续
-                    pass
-            
-            elapsed = int(time.time() - start_time)
-            if progress_callback:
-                progress_callback(
-                    t('progress.zepProcessing', completed=completed_count, total=total_episodes, pending=len(pending_episodes), elapsed=elapsed),
-                    completed_count / total_episodes if total_episodes > 0 else 0
-                )
-            
-            if pending_episodes:
-                time.sleep(3)  # 每3秒检查一次
-        
-        if progress_callback:
-            progress_callback(t('progress.processingComplete', completed=completed_count, total=total_episodes), 1.0)
-    
+                    if progress_callback:
+                        progress_callback(
+                            t('progress.batchFailed', batch=i + 1, error=redact_secrets(str(e))), 0
+                        )
+                    raise RuntimeError(t('api.llmExtractionError', detail=redact_secrets(str(e)))) from e
+
+                if progress_callback:
+                    progress = (i + 1) / total_chunks
+                    progress_callback(
+                        t('progress.sendingBatch', current=i + 1, total=total_chunks, chunks=1),
+                        progress
+                    )
+
+        try:
+            asyncio.run(_add_all())
+        except (RedisConnectionError, RedisTimeoutError) as e:
+            raise RuntimeError(t('api.falkordbConnectionError', detail=redact_secrets(str(e)))) from e
+
+        return episode_uuids
+
     def _get_graph_info(self, graph_id: str) -> GraphInfo:
         """获取图谱信息"""
-        # 获取节点（分页）
-        nodes = fetch_all_nodes(self.client, graph_id)
+        graphiti = build_graphiti(self.user_llm_config, graph_id)
+        # 用 fetch_nodes_and_edges（单一 event loop 内完成两次查询），不要分开
+        # 呼叫 fetch_all_nodes + fetch_all_edges——同一个 driver 的底层 async
+        # redis 连线绑在建立时的 event loop 上，分开呼叫会在第二次触发
+        # "Event loop is closed"（Stage 5 端到端测试对真实 FalkorDB 实测到的）。
+        nodes, edges = fetch_nodes_and_edges(graphiti.driver, graph_id)
 
-        # 获取边（分页）
-        edges = fetch_all_edges(self.client, graph_id)
-
-        # 统计实体类型
         entity_types = set()
         for node in nodes:
             if node.labels:
@@ -422,64 +313,43 @@ class GraphBuilderService:
             edge_count=len(edges),
             entity_types=list(entity_types)
         )
-    
-    def get_graph_data(self, graph_id: str) -> Dict[str, Any]:
-        """
-        获取完整图谱数据（包含详细信息）
-        
-        Args:
-            graph_id: 图谱ID
-            
-        Returns:
-            包含nodes和edges的字典，包括时间信息、属性等详细数据
-        """
-        nodes = fetch_all_nodes(self.client, graph_id)
-        edges = fetch_all_edges(self.client, graph_id)
 
-        # 创建节点映射用于获取节点名称
+    def get_graph_data(self, graph_id: str) -> Dict[str, Any]:
+        """获取完整图谱数据（包含详细信息），供 /data/<graph_id> 接口使用"""
+        enforce_embedding_consistency(self.user_llm_config, graph_id)
+
+        graphiti = build_graphiti(self.user_llm_config, graph_id)
+        nodes, edges = fetch_nodes_and_edges(graphiti.driver, graph_id)
+
         node_map = {}
         for node in nodes:
-            node_map[node.uuid_] = node.name or ""
-        
+            node_map[node.uuid] = node.name or ""
+
         nodes_data = []
         for node in nodes:
-            # 获取创建时间
             created_at = getattr(node, 'created_at', None)
-            if created_at:
-                created_at = str(created_at)
-            
             nodes_data.append({
-                "uuid": node.uuid_,
+                "uuid": node.uuid,
                 "name": node.name,
                 "labels": node.labels or [],
                 "summary": node.summary or "",
                 "attributes": node.attributes or {},
-                "created_at": created_at,
+                "created_at": str(created_at) if created_at else None,
             })
-        
+
         edges_data = []
         for edge in edges:
-            # 获取时间信息
             created_at = getattr(edge, 'created_at', None)
             valid_at = getattr(edge, 'valid_at', None)
             invalid_at = getattr(edge, 'invalid_at', None)
             expired_at = getattr(edge, 'expired_at', None)
-            
-            # 获取 episodes
-            episodes = getattr(edge, 'episodes', None) or getattr(edge, 'episode_ids', None)
-            if episodes and not isinstance(episodes, list):
-                episodes = [str(episodes)]
-            elif episodes:
-                episodes = [str(e) for e in episodes]
-            
-            # 获取 fact_type
-            fact_type = getattr(edge, 'fact_type', None) or edge.name or ""
-            
+            episodes = getattr(edge, 'episodes', None) or []
+
             edges_data.append({
-                "uuid": edge.uuid_,
+                "uuid": edge.uuid,
                 "name": edge.name or "",
                 "fact": edge.fact or "",
-                "fact_type": fact_type,
+                "fact_type": edge.name or "",
                 "source_node_uuid": edge.source_node_uuid,
                 "target_node_uuid": edge.target_node_uuid,
                 "source_node_name": node_map.get(edge.source_node_uuid, ""),
@@ -489,9 +359,9 @@ class GraphBuilderService:
                 "valid_at": str(valid_at) if valid_at else None,
                 "invalid_at": str(invalid_at) if invalid_at else None,
                 "expired_at": str(expired_at) if expired_at else None,
-                "episodes": episodes or [],
+                "episodes": [str(e) for e in episodes] if episodes else [],
             })
-        
+
         return {
             "graph_id": graph_id,
             "nodes": nodes_data,
@@ -499,8 +369,54 @@ class GraphBuilderService:
             "node_count": len(nodes_data),
             "edge_count": len(edges_data),
         }
-    
-    def delete_graph(self, graph_id: str):
-        """删除图谱"""
-        self.client.graph.delete(graph_id=graph_id)
 
+    def get_embedding_metadata(self) -> Dict[str, str]:
+        """回傳這次建圖要寫入專案 metadata 的 embedding 供應商/模型（呼叫端在
+        建圖成功後應該把這組值存到 Project.embedding_provider/embedding_model，
+        供之後的一致性檢查使用；見 graphiti_factory.enforce_embedding_consistency）。
+        """
+        provider = (self.user_llm_config.get("provider") or "").strip().lower()
+        return {
+            "embedding_provider": provider,
+            "embedding_model": get_embedding_identity(provider),
+        }
+
+    def delete_graph(self, graph_id: str):
+        """删除图谱（实例方法，向后兼容既有调用方式）。委托给不需要 BYOK
+        LLM 设定的模块级函数，见 delete_graph_by_id() 的说明。"""
+        delete_graph_by_id(graph_id)
+
+
+def delete_graph_by_id(graph_id: str) -> None:
+    """删除图谱：清除 FalkorDB 中该图谱的所有节点/边/episode。
+
+    刻意不透过 build_graphiti()（不组装 LLM/embedder）——删除是纯 FalkorDB
+    结构性操作，不应该因为使用者的 LLM key 失效/额度用尽而被挡住：这会造成
+    「想删除一个建图失败的项目，却因为同一个坏掉的 LLM key 而删不掉」的死锁。
+
+    database=graph_id 是关键：FalkorDB 的多租戶隔離是「每個 group_id 對應
+    一個獨立命名的 FalkorDB 資料庫」（graphiti-core 的 add_episode() 內部會
+    clone driver 成 database=group_id，見 graphiti_factory.build_graphiti()
+    的說明），不是同一張圖裡的篩選條件。少了這個參數，driver 會退回預設的
+    'default_db'，這個函式會在一個空的資料庫上執行 DELETE、變成靜默的
+    no-op——實際資料完全沒被刪掉（Stage 5 端到端測試對真實 FalkorDB 實測
+    到的問題：先前所有測試跑完顯示「已刪除」，其實從未真正刪過任何東西）。
+    這裡改用 group_id 本身當 database 名稱，就不再需要 WHERE group_id 篩選，
+    直接清空這個 database 底下的所有節點即可。
+    """
+    falkor_client = FalkorDB(
+        host=os.environ.get("FALKORDB_HOST", DEFAULT_FALKORDB_HOST),
+        port=int(os.environ.get("FALKORDB_PORT", str(DEFAULT_FALKORDB_PORT))),
+        password=os.environ.get("FALKORDB_PASSWORD") or None,
+        socket_connect_timeout=FALKORDB_SOCKET_CONNECT_TIMEOUT,
+        socket_timeout=FALKORDB_SOCKET_TIMEOUT,
+    )
+    driver = FalkorDriver(
+        falkor_db=falkor_client,
+        database=graph_id,
+    )
+
+    async def _clear():
+        await driver.execute_query("MATCH (n) DETACH DELETE n")
+
+    asyncio.run(_clear())

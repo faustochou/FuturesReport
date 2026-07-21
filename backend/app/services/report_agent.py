@@ -935,33 +935,44 @@ class ReportAgent:
     MAX_TOOL_CALLS_PER_CHAT = 2
     
     def __init__(
-        self, 
+        self,
         graph_id: str,
         simulation_id: str,
         simulation_requirement: str,
         llm_client: Optional[LLMClient] = None,
-        zep_tools: Optional[ZepToolsService] = None
+        zep_tools: Optional[ZepToolsService] = None,
+        user_llm_config: Optional[Dict[str, str]] = None
     ):
         """
         初始化Report Agent
-        
+
         Args:
             graph_id: 图谱ID
             simulation_id: 模拟ID
             simulation_requirement: 模拟需求描述
             llm_client: LLM客户端（可选）
-            zep_tools: Zep工具服务（可选）
+            zep_tools: Zep工具服务（可选，未提供时用 user_llm_config 组装一个）
+            user_llm_config: 使用者 BYOK LLM 设定，用于组装图谱检索工具（ZepToolsService）。
+                图谱检索必须跟建图时用的 embedding 供应商/模型一致（见
+                graphiti_factory.enforce_embedding_consistency），所以这里不能沿用
+                Config.REPORT_LLM_* 这个独立于 BYOK 之外的报告撰写用全局设定。
         """
         self.graph_id = graph_id
         self.simulation_id = simulation_id
         self.simulation_requirement = simulation_requirement
-        
+
         self.llm = llm_client or LLMClient(
             api_key=Config.REPORT_LLM_API_KEY,
             base_url=Config.REPORT_LLM_BASE_URL,
             model=Config.REPORT_LLM_MODEL_NAME
         )
-        self.zep_tools = zep_tools or ZepToolsService(llm_client=self.llm)
+
+        if zep_tools is not None:
+            self.zep_tools = zep_tools
+        else:
+            if not user_llm_config:
+                raise ValueError(t('api.llmConfigMissing'))
+            self.zep_tools = ZepToolsService(user_llm_config, llm_client=self.llm)
         
         # 工具定义
         self.tools = self._define_tools()

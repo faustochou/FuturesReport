@@ -152,7 +152,8 @@ def generate_report():
                     graph_id=graph_id,
                     simulation_id=simulation_id,
                     simulation_requirement=simulation_requirement,
-                    llm_client=llm_client
+                    llm_client=llm_client,
+                    user_llm_config=llm_config
                 )
                 # 进度回调
                 def progress_callback(stage, progress, message):
@@ -566,7 +567,8 @@ def chat_with_report_agent():
             graph_id=graph_id,
             simulation_id=simulation_id,
             simulation_requirement=simulation_requirement,
-            llm_client=llm_client
+            llm_client=llm_client,
+            user_llm_config=llm_config
         )
         result = agent.chat(message=message, chat_history=chat_history)
         
@@ -953,10 +955,11 @@ def stream_console_log(report_id: str):
 # ============== 工具调用接口（供调试使用）==============
 
 @report_bp.route('/tools/search', methods=['POST'])
+@require_llm_config
 def search_graph_tool():
     """
     图谱搜索工具接口（供调试使用）
-    
+
     请求（JSON）：
         {
             "graph_id": "fr_xxxx",
@@ -966,20 +969,20 @@ def search_graph_tool():
     """
     try:
         data = request.get_json() or {}
-        
+
         graph_id = data.get('graph_id')
         query = data.get('query')
         limit = data.get('limit', 10)
-        
+
         if not graph_id or not query:
             return jsonify({
                 "success": False,
                 "error": t('api.requireGraphIdAndQuery')
             }), 400
-        
+
         from ..services.zep_tools import ZepToolsService
-        
-        tools = ZepToolsService()
+
+        tools = ZepToolsService(get_current_llm_config())
         result = tools.search_graph(
             graph_id=graph_id,
             query=query,
@@ -1001,10 +1004,11 @@ def search_graph_tool():
 
 
 @report_bp.route('/tools/statistics', methods=['POST'])
+@require_llm_config
 def get_graph_statistics_tool():
     """
     图谱统计工具接口（供调试使用）
-    
+
     请求（JSON）：
         {
             "graph_id": "fr_xxxx"
@@ -1012,18 +1016,18 @@ def get_graph_statistics_tool():
     """
     try:
         data = request.get_json() or {}
-        
+
         graph_id = data.get('graph_id')
-        
+
         if not graph_id:
             return jsonify({
                 "success": False,
                 "error": t('api.requireGraphId')
             }), 400
-        
+
         from ..services.zep_tools import ZepToolsService
-        
-        tools = ZepToolsService()
+
+        tools = ZepToolsService(get_current_llm_config())
         result = tools.get_graph_statistics(graph_id)
         
         return jsonify({

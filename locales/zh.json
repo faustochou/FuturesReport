@@ -337,6 +337,13 @@
     "toggleMaximize": "最大化/还原",
     "closeHint": "关闭提示"
   },
+  "graphiti": {
+    "noEmbeddingSupport": "图谱构建需要 embedding 支持，请改用 Gemini、OpenAI 或其他提供 embedding 端点的供应商。（当前选择：{provider}）",
+    "precheckQuotaError": "LLM 额度不足或已达速率限制：{detail}",
+    "precheckAuthError": "LLM 认证失败，请检查 API Key 是否正确：{detail}",
+    "precheckGenericError": "LLM 预检失败：{detail}",
+    "embeddingMismatch": "此项目的图谱以 {provider}/{model} 建立，语义搜索需使用相同的 embedding 模型。请切回原模型，或重新构建图谱。"
+  },
   "history": {
     "title": "推演记录",
     "graphBuild": "图谱构建",
@@ -569,7 +576,9 @@
     "noDocProcessed": "没有成功处理任何文档，请检查文件格式",
     "requireProjectId": "请提供 project_id",
     "configError": "配置错误: {details}",
-    "zepApiKeyMissing": "ZEP_API_KEY未配置",
+    "llmConfigMissing": "请先在账号设置中配置 LLM 供应商与 API Key",
+    "falkordbConnectionError": "无法连接到图谱数据库（FalkorDB），请稍后重试或联系管理员：{detail}",
+    "llmExtractionError": "图谱构建时 LLM 抽取失败，请检查你的 LLM 设定与额度：{detail}",
     "ontologyNotGenerated": "项目尚未生成本体，请先调用 /ontology/generate",
     "graphBuilding": "图谱正在构建中，请勿重复提交。如需强制重建，请添加 force: true",
     "textNotFound": "未找到提取的文本内容",
@@ -637,6 +646,7 @@
   },
   "progress": {
     "initGraphService": "初始化图谱构建服务...",
+    "precheckingLlm": "预检 LLM 设定（结构化输出与 embedding）...",
     "textChunking": "文本分块中...",
     "creatingZepGraph": "创建Zep图谱...",
     "settingOntology": "设置本体定义...",

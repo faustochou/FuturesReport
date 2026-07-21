@@ -1,22 +1,19 @@
 """
-Zep图谱记忆更新服务
-将模拟中的Agent活动动态更新到Zep图谱中
+图谱记忆更新服务
+将模拟中的Agent活动动态更新到 Graphiti/FalkorDB 图谱中（BYOK：用使用者自己的 LLM/embedding）
 """
 
-import os
+import asyncio
 import time
 import threading
-import json
-from typing import Dict, Any, List, Optional, Callable
+from typing import Dict, Any, List, Optional
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from queue import Queue, Empty
 
-from zep_cloud.client import Zep
-
-from ..config import Config
 from ..utils.logger import get_logger
 from ..utils.locale import get_locale, set_locale
+from .graphiti_factory import build_graphiti, enforce_embedding_consistency, redact_secrets
 
 logger = get_logger('futuresreport.zep_graph_memory_updater')
 
@@ -229,22 +226,31 @@ class ZepGraphMemoryUpdater:
     MAX_RETRIES = 3
     RETRY_DELAY = 2  # 秒
     
-    def __init__(self, graph_id: str, api_key: Optional[str] = None):
+    def __init__(self, graph_id: str, user_llm_config: Dict[str, str]):
         """
         初始化更新器
-        
+
         Args:
-            graph_id: Zep图谱ID
-            api_key: Zep API Key（可选，默认从配置读取）
+            graph_id: 图谱ID
+            user_llm_config: 使用者 BYOK LLM 设定（provider/model/base_url/api_key）
         """
         self.graph_id = graph_id
-        self.api_key = api_key or Config.ZEP_API_KEY
-        
-        if not self.api_key:
-            raise ValueError("ZEP_API_KEY未配置")
-        
-        self.client = Zep(api_key=self.api_key)
-        
+        if not user_llm_config or not user_llm_config.get("api_key"):
+            raise ValueError("LLM 设定缺失：请先配置 BYOK LLM 供应商与 API Key")
+        self.user_llm_config = user_llm_config
+
+        # 建圖時已經記錄過 embedding 供應商/模型，這裡在啟動更新器前先做一次性
+        # 一致性檢查（而不是每個 batch 都查一次），不一致就快速失敗。
+        enforce_embedding_consistency(self.user_llm_config, self.graph_id)
+
+        # 不快取單一 Graphiti 實例：這個更新器的生命週期內會送出多個批次，
+        # 每個批次各自呼叫一次 asyncio.run()，沿用同一個 driver 會在第二個
+        # 批次開始時炸 "Event loop is closed"（Stage 5 端到端測試對真實
+        # FalkorDB 實測到的——底層 async redis 連線綁定在建立當下的 event
+        # loop 上）。改成每次送出前用 _get_graphiti() 現建一個新的。
+        # 這裡先建一次只是為了讓建構子本身也驗證一次 BYOK 設定能成功組裝。
+        build_graphiti(self.user_llm_config, self.graph_id)
+
         # 活动队列
         self._activity_queue: Queue = Queue()
         
@@ -271,6 +277,9 @@ class ZepGraphMemoryUpdater:
     def _get_platform_display_name(self, platform: str) -> str:
         """获取平台的显示名称"""
         return self.PLATFORM_DISPLAY_NAMES.get(platform.lower(), platform)
+
+    def _get_graphiti(self):
+        return build_graphiti(self.user_llm_config, self.graph_id)
     
     def start(self):
         """启动后台工作线程"""
@@ -411,25 +420,32 @@ class ZepGraphMemoryUpdater:
         # 带重试的发送
         for attempt in range(self.MAX_RETRIES):
             try:
-                self.client.graph.add(
-                    graph_id=self.graph_id,
-                    type="text",
-                    data=combined_text
+                # 每次送出（含重试）都现建一个新的 Graphiti 实例——见 __init__
+                # 里的说明，同一个 driver 跨多次 asyncio.run() 会炸 "Event loop
+                # is closed"。
+                asyncio.run(
+                    self._get_graphiti().add_episode(
+                        name=f"{self.graph_id}_sim_activity_{self._total_sent}",
+                        episode_body=combined_text,
+                        source_description="Futures Report simulation activity",
+                        reference_time=datetime.now(timezone.utc),
+                        group_id=self.graph_id,
+                    )
                 )
-                
+
                 self._total_sent += 1
                 self._total_items_sent += len(activities)
                 display_name = self._get_platform_display_name(platform)
                 logger.info(f"成功批量发送 {len(activities)} 条{display_name}活动到图谱 {self.graph_id}")
                 logger.debug(f"批量内容预览: {combined_text[:200]}...")
                 return
-                
+
             except Exception as e:
                 if attempt < self.MAX_RETRIES - 1:
-                    logger.warning(f"批量发送到Zep失败 (尝试 {attempt + 1}/{self.MAX_RETRIES}): {e}")
+                    logger.warning(f"批量发送到图谱失败 (尝试 {attempt + 1}/{self.MAX_RETRIES}): {redact_secrets(str(e))}")
                     time.sleep(self.RETRY_DELAY * (attempt + 1))
                 else:
-                    logger.error(f"批量发送到Zep失败，已重试{self.MAX_RETRIES}次: {e}")
+                    logger.error(f"批量发送到图谱失败，已重试{self.MAX_RETRIES}次: {redact_secrets(str(e))}")
                     self._failed_count += 1
     
     def _flush_remaining(self):
@@ -487,14 +503,15 @@ class ZepGraphMemoryManager:
     _lock = threading.Lock()
     
     @classmethod
-    def create_updater(cls, simulation_id: str, graph_id: str) -> ZepGraphMemoryUpdater:
+    def create_updater(cls, simulation_id: str, graph_id: str, user_llm_config: Dict[str, str]) -> ZepGraphMemoryUpdater:
         """
         为模拟创建图谱记忆更新器
-        
+
         Args:
             simulation_id: 模拟ID
-            graph_id: Zep图谱ID
-            
+            graph_id: 图谱ID
+            user_llm_config: 使用者 BYOK LLM 设定（provider/model/base_url/api_key）
+
         Returns:
             ZepGraphMemoryUpdater实例
         """
@@ -502,11 +519,11 @@ class ZepGraphMemoryManager:
             # 如果已存在，先停止旧的
             if simulation_id in cls._updaters:
                 cls._updaters[simulation_id].stop()
-            
-            updater = ZepGraphMemoryUpdater(graph_id)
+
+            updater = ZepGraphMemoryUpdater(graph_id, user_llm_config)
             updater.start()
             cls._updaters[simulation_id] = updater
-            
+
             logger.info(f"创建图谱记忆更新器: simulation_id={simulation_id}, graph_id={graph_id}")
             return updater
     

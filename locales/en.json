@@ -337,6 +337,13 @@
     "toggleMaximize": "Maximize/Restore",
     "closeHint": "Close hint"
   },
+  "graphiti": {
+    "noEmbeddingSupport": "Graph construction requires embedding support. Please switch to Gemini, OpenAI, or another provider that offers an embedding endpoint. (Current selection: {provider})",
+    "precheckQuotaError": "LLM quota exceeded or rate-limited: {detail}",
+    "precheckAuthError": "LLM authentication failed. Please check your API key: {detail}",
+    "precheckGenericError": "LLM precheck failed: {detail}",
+    "embeddingMismatch": "This project's graph was built with {provider}/{model}. Semantic search requires the same embedding model. Please switch back to that model, or rebuild the graph."
+  },
   "history": {
     "title": "Simulation History",
     "graphBuild": "Graph Build",
@@ -569,7 +576,9 @@
     "noDocProcessed": "No documents were processed successfully. Please check file formats.",
     "requireProjectId": "Please provide project_id",
     "configError": "Configuration error: {details}",
-    "zepApiKeyMissing": "ZEP_API_KEY not configured",
+    "llmConfigMissing": "Please configure an LLM provider and API key in account settings first",
+    "falkordbConnectionError": "Could not connect to the graph database (FalkorDB). Please retry later or contact an administrator: {detail}",
+    "llmExtractionError": "LLM extraction failed while building the graph. Please check your LLM settings and quota: {detail}",
     "ontologyNotGenerated": "Ontology not yet generated. Please call /ontology/generate first.",
     "graphBuilding": "Graph build in progress. Do not resubmit. To force rebuild, add force: true.",
     "textNotFound": "Extracted text content not found",
@@ -637,6 +646,7 @@
   },
   "progress": {
     "initGraphService": "Initializing graph build service...",
+    "precheckingLlm": "Prechecking LLM settings (structured output and embedding)...",
     "textChunking": "Chunking text...",
     "creatingZepGraph": "Creating Zep graph...",
     "settingOntology": "Setting ontology definition...",

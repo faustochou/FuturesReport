@@ -121,9 +121,14 @@ LLM_API_KEY=your_api_key
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_MODEL_NAME=qwen-plus
 
-# Zep Cloud Configuration
-# Free monthly quota is sufficient for simple usage: https://app.getzep.com/
-ZEP_API_KEY=your_zep_api_key
+# FalkorDB (self-hosted graph engine, replaces Zep Cloud)
+# LLM/embedding calls are BYOK — each user's own model settings, not a platform-wide key.
+# Source deployment: run FalkorDB locally first, e.g.:
+#   docker run -p 6379:6379 -p 3000:3000 -d falkordb/falkordb:latest
+# Docker/Zeabur deployment: FALKORDB_HOST/PORT/PASSWORD are auto-injected, leave unset here.
+# FALKORDB_HOST=localhost
+# FALKORDB_PORT=6379
+# FALKORDB_PASSWORD=
 ```
 
 #### 2. Install Dependencies
@@ -186,6 +191,22 @@ To avoid this, configure persistent storage before deploying on Zeabur:
 3. (Optional but recommended) Also point `USER_DATA_DIR` at a path under the same volume (e.g. `/data`) if you rely on the SQLite fallback instead of `DATABASE_URL`, so the database file persists across redeploys too.
 
 Without this volume + `UPLOAD_FOLDER` configuration, project/simulation/report files will be lost on every redeploy even though database records remain — this is a known limitation of ephemeral container storage, not a bug in the application logic.
+
+#### FalkorDB on Zeabur
+
+The knowledge-graph engine (Graphiti + FalkorDB, replacing Zep Cloud) needs its own persistent service:
+
+1. In your Zeabur project, add a service from the prebuilt **FalkorDB** template (or a generic Docker service using image `falkordb/falkordb:latest`, exposing port `6379`).
+2. Attach a **Volume** to that service and mount it at `/data` — this is FalkorDB's actual persistence directory (confirmed against [docs.falkordb.com/operations/docker](https://docs.falkordb.com/operations/docker)), same requirement as the uploads volume above: without it, every redeploy wipes all built knowledge graphs.
+3. Set a real password: on the FalkorDB service, set `REDIS_ARGS=--requirepass <your-password>`.
+4. On the **backend** service, set:
+   - `FALKORDB_HOST=<the FalkorDB service's internal hostname>` (Zeabur exposes inter-service DNS names, similar to how `DATABASE_URL` reaches the Postgres service)
+   - `FALKORDB_PORT=6379`
+   - `FALKORDB_PASSWORD=<the same password from step 3>`
+
+LLM/embedding calls made against FalkorDB are BYOK (each user's own model settings, read from their account), so no platform-wide LLM key needs to be configured for the graph engine itself — only the FalkorDB connection details above.
+
+> ⚠️ **Close the public port after testing.** If you temporarily expose FalkorDB's port to the public internet (e.g. Zeabur's "Networking → Public Domain/TCP Proxy") to run integration tests from your local machine, turn that exposure back off once testing is done. The backend should only ever reach FalkorDB over Zeabur's internal network — there's no reason for the graph database to be reachable from outside the project at all in normal operation.
 
 ## 📄 Acknowledgments
 

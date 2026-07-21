@@ -121,9 +121,14 @@ LLM_API_KEY=your_api_key
 LLM_BASE_URL=https://dashscope.aliyuncs.com/compatible-mode/v1
 LLM_MODEL_NAME=qwen-plus
 
-# Zep Cloud 配置
-# 每月免费额度即可支撑简单使用：https://app.getzep.com/
-ZEP_API_KEY=your_zep_api_key
+# FalkorDB（自架图谱引擎，取代 Zep Cloud）
+# LLM/embedding 调用采用 BYOK——用每个用户自己的模型设定，不是平台统一的 key。
+# 源码部署：先在本机跑一个 FalkorDB，例如：
+#   docker run -p 6379:6379 -p 3000:3000 -d falkordb/falkordb:latest
+# Docker/Zeabur 部署：FALKORDB_HOST/PORT/PASSWORD 由部署环境自动注入，此处留空即可。
+# FALKORDB_HOST=localhost
+# FALKORDB_PORT=6379
+# FALKORDB_PASSWORD=
 ```
 
 #### 2. 安装依赖
@@ -186,6 +191,22 @@ Zeabur 的容器文件系统是**临时的（ephemeral）**：每次重新部署
 3. （可选但建议）如果你使用 SQLite 回退方案而非 `DATABASE_URL`，也请将 `USER_DATA_DIR` 指向同一持久化卷下的路径（例如 `/data`），使数据库文件同样能在重新部署后保留。
 
 如果没有配置持久化卷与 `UPLOAD_FOLDER`，即使数据库记录仍然存在，项目/模拟/报告文件也会在每次重新部署后丢失——这是容器临时存储的已知限制，并非应用逻辑的缺陷。
+
+#### Zeabur 上的 FalkorDB
+
+图谱知识引擎（Graphiti + FalkorDB，取代 Zep Cloud）需要一个独立的持久化服务：
+
+1. 在 Zeabur 专案中，从预建的 **FalkorDB** 模板新增一个服务（或用通用 Docker 服务、镜像填 `falkordb/falkordb:latest`，暴露 `6379` 端口）。
+2. 给这个服务挂一个 **Volume**，挂载路径设为 `/data`——这是 FalkorDB 实际的持久化目录（已对照 [docs.falkordb.com/operations/docker](https://docs.falkordb.com/operations/docker) 官方文件确认），跟上面 uploads 卷同样重要：没挂的话每次重新部署都会清空已建好的所有图谱。
+3. 设一个真实密码：在 FalkorDB 服务上设置 `REDIS_ARGS=--requirepass <你的密码>`。
+4. 在**后端**服务上设置：
+   - `FALKORDB_HOST=<FalkorDB 服务的内部主机名>`（Zeabur 会提供服务间的内部 DNS 名称，跟后端连到 Postgres 服务的方式一样）
+   - `FALKORDB_PORT=6379`
+   - `FALKORDB_PASSWORD=<步骤 3 设定的同一组密码>`
+
+对 FalkorDB 的 LLM/embedding 调用采用 BYOK（每个用户自己账号设定里的模型），所以图谱引擎本身不需要设定任何平台级 LLM key——只需要上面这几个 FalkorDB 连接设定。
+
+> ⚠️ **测试完成后请关闭对外开放的端口。** 如果为了从本机跑整合测试而临时把 FalkorDB 的端口开放到公网（例如 Zeabur 的「Networking → Public Domain/TCP Proxy」），测试结束后务必把这个对外开放关掉。正常运作时后端应该只透过 Zeabur 内部网络连线到 FalkorDB，图谱数据库完全没有理由能被专案外部访问。
 
 ## 📄 致谢
 

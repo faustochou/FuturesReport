@@ -65,11 +65,11 @@
 | DELETE | `/api/graph/project/<id>` | 刪除專案 | 無 |
 | POST | `/api/graph/project/<id>/reset` | 重置專案狀態 | 無 |
 | POST | `/api/graph/ontology/generate` | 上傳檔案 → 生成本體定義（LLM） | `@require_llm_config` |
-| POST | `/api/graph/build` | 建構 Zep 知識圖譜（非同步任務） | 無 |
+| POST | `/api/graph/build` | 建構知識圖譜（Graphiti/FalkorDB，非同步任務） | `@require_llm_config` |
 | GET | `/api/graph/task/<id>` | 查詢任務狀態 | 無 |
 | GET | `/api/graph/tasks` | 列出所有任務 | 無 |
-| GET | `/api/graph/data/<graph_id>` | 取得圖譜節點/邊資料 | 無 |
-| DELETE | `/api/graph/delete/<graph_id>` | 刪除 Zep 圖譜 | 無 |
+| GET | `/api/graph/data/<graph_id>` | 取得圖譜節點/邊資料 | `@require_llm_config` |
+| DELETE | `/api/graph/delete/<graph_id>` | 刪除圖譜（純 FalkorDB 結構操作，不需 LLM 設定） | 無 |
 
 ### 2.5 Simulation — `/api/simulation`
 
@@ -188,16 +188,20 @@
 
 ---
 
-## 8. Zep 整合點
+## 8. Graphiti / FalkorDB 整合點
+
+圖譜引擎已從 Zep Cloud 遷移為自架 Graphiti + FalkorDB，LLM/embedding 採 BYOK（用每個使用者自己帳號設定裡的模型，非平台級 key）。模組檔名/類別名沿用舊的 `zep_*` 命名（呼叫端零/最小改動），但內部實作已完全是 Graphiti/FalkorDB。
 
 | 服務 | 檔案 | 用途 |
 |------|------|------|
-| GraphBuilderService | `services/graph_builder.py` | 建立 Zep Graph、上傳文本 Episode、設定本體 |
-| ZepEntityReader | `services/zep_entity_reader.py` | 從 Zep Graph 讀取並過濾實體 |
-| ZepToolsService | `services/zep_tools.py` | Report Agent 調用：搜尋圖譜、取得統計 |
-| ZepGraphMemoryUpdater | `services/zep_graph_memory_updater.py` | 模擬執行中將 Agent 動作寫回 Zep |
-| zep_paging | `utils/zep_paging.py` | Zep API 分頁輔助函式 |
-| **環境變數**：`ZEP_API_KEY` | Config | 必填（缺失僅警告，不阻止啟動） |
+| GraphBuilderService | `services/graph_builder.py` | 建立圖譜、`add_episode` 逐 chunk 寫入、設定本體（`graphiti_ontology.py` 轉換） |
+| ZepEntityReader | `services/zep_entity_reader.py` | 從 FalkorDB 讀取並過濾實體 |
+| ZepToolsService | `services/zep_tools.py` | Report Agent 調用：Graphiti 搜尋（RRF）、取得統計 |
+| ZepGraphMemoryUpdater | `services/zep_graph_memory_updater.py` | 模擬執行中將 Agent 動作寫回圖譜（執行於後端主進程，非模擬子進程） |
+| zep_paging | `utils/zep_paging.py` | `EntityNode/EntityEdge.get_by_group_ids()` 分頁輔助函式 |
+| graphiti_factory | `services/graphiti_factory.py` | BYOK 組裝 Graphiti 實例、LLM 預檢、embedding 一致性守門 |
+| graphiti_ontology | `services/graphiti_ontology.py` | 本體定義 → Graphiti `entity_types`/`edge_types`/`edge_type_map` |
+| **環境變數**：`FALKORDB_HOST`/`FALKORDB_PORT`/`FALKORDB_PASSWORD` | Config | FalkorDB 連線資訊（平台層級，與使用者 LLM 設定無關） |
 
 ---
 
@@ -244,7 +248,7 @@
 | 變數 | 用途 |
 |------|------|
 | `SECRET_KEY` | JWT / token 簽名 |
-| `ZEP_API_KEY` | Zep Cloud |
+| `FALKORDB_HOST` / `FALKORDB_PORT` / `FALKORDB_PASSWORD` | FalkorDB 連線資訊（圖譜引擎，取代 Zep Cloud；LLM/embedding 為 BYOK，不在此表） |
 | `STRIPE_SECRET_KEY` | Stripe API |
 | `STRIPE_WEBHOOK_SECRET` | Webhook 簽名驗證 |
 | `STRIPE_PUBLISHABLE_KEY` | Admin UI 顯示（非必填） |

@@ -26,8 +26,15 @@ dependencies = [
     "stripe>=10.0.0",
     "cryptography>=42.0.0",
 
-    # Zep Cloud
-    "zep-cloud==3.13.0",
+    # Graphiti + FalkorDB（取代 Zep Cloud 的圖譜引擎；BYOK 動態組裝 LLM/embedder，
+    # 見 app/services/graphiti_factory.py）。google-genai 用於原生 Gemini LLM/embedder。
+    # 已知依賴衝突：graphiti-core[falkordb] 會把 neo4j 拉到 6.2.0，
+    # 但下面 camel-oasis==0.2.5 鎖定 neo4j==5.23.0。經驗證 `import oasis`/`import camel`
+    # 在 neo4j 6.2.0 下仍正常（camel-oasis 的 neo4j 依賴是其內建的替代圖儲存後端，
+    # 本專案的模擬引擎並未使用該路徑）。刻意保留 6.2.0（不鎖回 5.23.0），並在
+    # backend/tests/ 增加 camel-oasis 煙霧測試覆蓋。日後升級 camel-oasis 版本時
+    # 需重新確認此 override 是否仍然安全。
+    "graphiti-core[falkordb,google-genai]>=0.29.0",
 
     # OASIS 社交媒体模拟
     "camel-oasis==0.2.5",
@@ -56,9 +63,14 @@ dev = [
     "pipreqs>=0.5.0",
 ]
 
-[build-system]
-requires = ["hatchling"]
-build-backend = "hatchling.build"
+[tool.uv]
+# camel-oasis==0.2.5 硬鎖 neo4j==5.23.0，但 graphiti-core[falkordb]>=0.29.0 需要
+# neo4j>=5.26.0；uv 的解析器（跟 pip 不同）在這個宣告衝突上會直接拒絕產生 lockfile。
+# 見上方 dependencies 區塊 graphiti-core 那一行的完整衝突說明與煙霧測試佐證——
+# 已驗證 neo4j 6.2.0 下 camel-oasis 的 import/實際模擬路徑都正常（其 neo4j 依賴是
+# 內建替代圖儲存後端，本專案未使用）。這裡用 override 強制解析結果採用 6.2.0，
+# 對應 backend/tests/test_camel_oasis_smoke.py 的驗證基準。
+override-dependencies = ["neo4j>=5.26.0"]
 
 [dependency-groups]
 dev = [

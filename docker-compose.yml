@@ -21,6 +21,35 @@ services:
       retries: 10
       start_period: 10s
 
+  # ── FalkorDB (self-hosted Graphiti knowledge-graph backend) ─────────────────
+  # Replaces Zep Cloud as the graph engine (see backend/app/services/graphiti_factory.py).
+  # Single instance, multi-tenant via group_id — one project per graph_id, no
+  # per-project database needed. LLM/embedding calls are BYOK (per-user), so this
+  # service only stores graph data; it never sees the user's LLM API key.
+  falkordb:
+    image: falkordb/falkordb:latest
+    container_name: futuresreport-falkordb
+    restart: unless-stopped
+    environment:
+      # 生产环境务必覆盖这个默认密码（同步改 futuresreport 服务的 FALKORDB_PASSWORD）。
+      # --requirepass 不能收到空值，所以这里跟 db 服务一样给一个非空默认值，
+      # 而不是留空——留空会让 FalkorDB 启动时的 --requirepass 参数没有值。
+      REDIS_ARGS: "--requirepass ${FALKORDB_PASSWORD:-falkordb123}"
+    volumes:
+      - falkordb_data:/data   # graph data survives container rebuilds (confirmed against
+                              # docs.falkordb.com/operations/docker — /data is correct)
+    # 只给内部服务用（同一个 docker 网络内用 service 名 falkordb 连线），
+    # 不对外开放端口；本机除错需要时再取消注释
+    # ports:
+    #   - "6379:6379"
+    #   - "3001:3000"   # FalkorDB 内建的图谱浏览器 UI（3000 跟前端撞了，改映射 3001）
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${FALKORDB_PASSWORD:-falkordb123}", "--no-auth-warning", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+
   # ── Application (frontend + backend in one image) ──────────────────────────
   futuresreport:
     build:
@@ -31,15 +60,20 @@ services:
     env_file:
       - .env
     environment:
-      # Override / supplement .env so the app reaches the DB container by name
+      # Override / supplement .env so the app reaches the DB/FalkorDB containers by name
       DATABASE_URL: postgresql://${POSTGRES_USER:-futures}:${POSTGRES_PASSWORD:-futures123}@db:5432/${POSTGRES_DB:-futuresreport}
       USER_DATA_DIR: /data
+      FALKORDB_HOST: falkordb
+      FALKORDB_PORT: "6379"
+      FALKORDB_PASSWORD: ${FALKORDB_PASSWORD:-falkordb123}
     ports:
       - "3000:3000"
       - "5001:5001"
     restart: unless-stopped
     depends_on:
       db:
+        condition: service_healthy
+      falkordb:
         condition: service_healthy
     volumes:
       - futuresreport-data:/data                    # legacy JSON / task files
@@ -60,5 +94,6 @@ services:
 
 volumes:
   postgres_data:          # PostgreSQL data – never deleted by `docker compose down`
+  falkordb_data:          # FalkorDB graph data (Graphiti knowledge graphs)
   futuresreport-data:     # Legacy /data volume (tasks, jobs, migration source)
   # redis-data:

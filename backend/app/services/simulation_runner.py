@@ -34,6 +34,13 @@ logger = get_logger('futuresreport.simulation_runner')
 # 标记是否已注册清理函数
 _cleanup_registered = False
 
+# simulation_config.json 里如果出现看起来像密钥的欄位名（不分大小写子字串比对），
+# 一律改写为遮罩值。目前 SimulationConfigGenerator.to_dict() 只写 llm_model
+# （模型名），不写 api_key，所以这在今天是纯防御性的——但明确要求全链路都要有
+# 这道保险，不假设「现在没写」在未来的程式修改下依然成立。
+_SENSITIVE_CONFIG_KEY_SUBSTRINGS = ("api_key", "apikey", "secret", "access_token", "token")
+_REDACTED_PLACEHOLDER = "***REDACTED***"
+
 # 平台检测
 IS_WINDOWS = sys.platform == 'win32'
 
@@ -243,7 +250,53 @@ class SimulationRunner:
     
     # 图谱记忆更新配置
     _graph_memory_enabled: Dict[str, bool] = {}  # simulation_id -> enabled
-    
+
+    @classmethod
+    def _scrub_llm_keys_in_config(cls, simulation_id: str) -> None:
+        """把 simulation_config.json 里任何看起来像密钥的欄位改写为遮罩值，避免
+        使用者的 LLM API Key 明文长存磁碟。
+
+        在模拟结束的每一条路径都呼叫（正常完成/失败/手动停止/服务器关闭），
+        也在 start_simulation() 开头呼叫一次（自我修复：万一上一次的清理路径
+        被跳过——例如进程被 SIGKILL 强制终止——下次读取同一个 config 时补做）。
+        本函数是幂等的：欄位已经是遮罩值就不重写，找不到 config 文件就直接返回。
+        """
+        sim_dir = os.path.join(cls.RUN_STATE_DIR, simulation_id)
+        config_path = os.path.join(sim_dir, "simulation_config.json")
+        if not os.path.exists(config_path):
+            return
+
+        def _scrub(obj) -> bool:
+            changed = False
+            if isinstance(obj, dict):
+                for key, value in obj.items():
+                    if (
+                        isinstance(value, str)
+                        and value
+                        and value != _REDACTED_PLACEHOLDER
+                        and any(s in key.lower() for s in _SENSITIVE_CONFIG_KEY_SUBSTRINGS)
+                    ):
+                        obj[key] = _REDACTED_PLACEHOLDER
+                        changed = True
+                    elif isinstance(value, (dict, list)) and _scrub(value):
+                        changed = True
+            elif isinstance(obj, list):
+                for item in obj:
+                    if isinstance(item, (dict, list)) and _scrub(item):
+                        changed = True
+            return changed
+
+        try:
+            with open(config_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+
+            if _scrub(data):
+                with open(config_path, 'w', encoding='utf-8') as f:
+                    json.dump(data, f, ensure_ascii=False, indent=2)
+                logger.info(f"已清除 simulation_config.json 中的敏感欄位: {simulation_id}")
+        except Exception as e:
+            logger.warning(f"清除 simulation_config.json 敏感欄位失败: {simulation_id}, error={e}")
+
     @classmethod
     def get_run_state(cls, simulation_id: str) -> Optional[SimulationRunState]:
         """获取运行状态"""
@@ -378,6 +431,10 @@ class SimulationRunner:
         Returns:
             SimulationRunState
         """
+        # 自我修复：万一上一次模拟结束时的敏感欄位清理被跳过（例如进程被强制
+        # 终止），这里补跑一次，确保不会在旧 config 上又叠加一次新的明文 key。
+        cls._scrub_llm_keys_in_config(simulation_id)
+
         # 检查是否已在运行
         existing = cls.get_run_state(simulation_id)
         if existing and existing.runner_status in [RunnerStatus.RUNNING, RunnerStatus.STARTING]:
@@ -437,13 +494,16 @@ class SimulationRunner:
         if enable_graph_memory_update:
             if not graph_id:
                 raise ValueError("启用图谱记忆更新时必须提供 graph_id")
-            
+            if not llm_config:
+                raise ValueError("启用图谱记忆更新时必须提供使用者的 LLM 设定")
+
             try:
-                ZepGraphMemoryManager.create_updater(simulation_id, graph_id)
+                ZepGraphMemoryManager.create_updater(simulation_id, graph_id, llm_config)
                 cls._graph_memory_enabled[simulation_id] = True
                 logger.info(f"已启用图谱记忆更新: simulation_id={simulation_id}, graph_id={graph_id}")
             except Exception as e:
-                logger.error(f"创建图谱记忆更新器失败: {e}")
+                from .graphiti_factory import redact_secrets
+                logger.error(f"创建图谱记忆更新器失败: {redact_secrets(str(e))}")
                 cls._graph_memory_enabled[simulation_id] = False
         else:
             cls._graph_memory_enabled[simulation_id] = False
@@ -651,7 +711,10 @@ class SimulationRunner:
                 except Exception as e:
                     logger.error(f"停止图谱记忆更新器失败: {e}")
                 cls._graph_memory_enabled.pop(simulation_id, None)
-            
+
+            # 模拟结束（无论成功/失败/异常），清除 config 中可能出现的敏感欄位
+            cls._scrub_llm_keys_in_config(simulation_id)
+
             # 清理进程资源
             cls._processes.pop(simulation_id, None)
             cls._action_queues.pop(simulation_id, None)
@@ -910,7 +973,11 @@ class SimulationRunner:
             except Exception as e:
                 logger.error(f"停止图谱记忆更新器失败: {e}")
             cls._graph_memory_enabled.pop(simulation_id, None)
-        
+
+        # 手动停止也走一次敏感欄位清理（与 _monitor_simulation 的 finally 重复
+        # 调用是安全的——_scrub_llm_keys_in_config 是幂等的）
+        cls._scrub_llm_keys_in_config(simulation_id)
+
         logger.info(f"模拟已停止: {simulation_id}")
         return state
     
@@ -1350,7 +1417,11 @@ class SimulationRunner:
                             logger.warning(f"state.json 不存在: {state_file}")
                     except Exception as state_err:
                         logger.warning(f"更新 state.json 失败: {simulation_id}, error={state_err}")
-                        
+
+                # 服务器关闭这条路径也要清理敏感欄位（进程可能是被强制终止的，
+                # _monitor_simulation 的 finally 不一定来得及跑）
+                cls._scrub_llm_keys_in_config(simulation_id)
+
             except Exception as e:
                 logger.error(f"清理进程失败: {simulation_id}, error={e}")
         

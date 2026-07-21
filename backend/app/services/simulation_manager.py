@@ -293,8 +293,10 @@ class SimulationManager:
             # ========== 阶段1: 读取并过滤实体 ==========
             if progress_callback:
                 progress_callback("reading", 0, t('progress.connectingZepGraph'))
-            
-            reader = ZepEntityReader()
+
+            if not llm_config:
+                raise ValueError(t('api.llmConfigMissing'))
+            reader = ZepEntityReader(llm_config)
             
             if progress_callback:
                 progress_callback("reading", 30, t('progress.readingNodeData'))

@@ -13,8 +13,10 @@ flask-cors>=6.0.0
 # OpenAI SDK（统一使用 OpenAI 格式调用 LLM）
 openai>=1.0.0
 
-# ============= Zep Cloud =============
-zep-cloud==3.13.0
+# ============= Graphiti + FalkorDB（取代 Zep Cloud 的圖譜引擎）=============
+# 已知依賴衝突：拉高 neo4j 到 6.2.0，與下方 camel-oasis 鎖定的 5.23.0 不一致；
+# 詳見 pyproject.toml 同一行的註解說明，此為刻意保留的 override。
+graphiti-core[falkordb,google-genai]>=0.29.0
 
 # ============= OASIS 社交媒体模拟 =============
 # OASIS 社交模拟框架

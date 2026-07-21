@@ -11,7 +11,8 @@ from flask import request, jsonify
 from . import graph_bp
 from ..config import Config
 from ..services.ontology_generator import OntologyGenerator
-from ..services.graph_builder import GraphBuilderService
+from ..services.graph_builder import GraphBuilderService, delete_graph_by_id
+from ..services.graphiti_factory import redact_secrets
 from ..services.text_processor import TextProcessor
 from ..utils.file_parser import FileParser
 from ..utils.logger import get_logger
@@ -262,10 +263,11 @@ def generate_ontology():
 # ============== 接口2：构建图谱 ==============
 
 @graph_bp.route('/build', methods=['POST'])
+@require_llm_config
 def build_graph():
     """
     接口2：根据project_id构建图谱
-    
+
     请求（JSON）：
         {
             "project_id": "proj_xxxx",  // 必填，来自接口1
@@ -273,7 +275,7 @@ def build_graph():
             "chunk_size": 500,          // 可选，默认500
             "chunk_overlap": 50         // 可选，默认50
         }
-        
+
     返回：
         {
             "success": true,
@@ -286,18 +288,9 @@ def build_graph():
     """
     try:
         logger.info("=== 开始构建图谱 ===")
-        
-        # 检查配置
-        errors = []
-        if not Config.ZEP_API_KEY:
-            errors.append(t('api.zepApiKeyMissing'))
-        if errors:
-            logger.error(f"配置错误: {errors}")
-            return jsonify({
-                "success": False,
-                "error": t('api.configError', details="; ".join(errors))
-            }), 500
-        
+
+        llm_config = get_current_llm_config()
+
         # 解析请求
         data = request.get_json() or {}
         project_id = data.get('project_id')
@@ -333,12 +326,16 @@ def build_graph():
                 "task_id": project.graph_build_task_id
             }), 400
         
-        # 如果强制重建，重置状态
+        # 如果强制重建，重置状态（embedding_provider/model 是 graph_id 的附属
+        # metadata，graph_id 清空时必须一起清空，否则会有旧 graph_id 的 embedding
+        # 供应商残留在没有对应 graph_id 的项目记录上）
         if force and project.status in [ProjectStatus.GRAPH_BUILDING, ProjectStatus.FAILED, ProjectStatus.GRAPH_COMPLETED]:
             project.status = ProjectStatus.ONTOLOGY_GENERATED
             project.graph_id = None
             project.graph_build_task_id = None
             project.error = None
+            project.embedding_provider = None
+            project.embedding_model = None
         
         # 获取配置
         graph_name = data.get('graph_name', project.name or 'Futures Report Graph')
@@ -390,9 +387,19 @@ def build_graph():
                     message=t('progress.initGraphService')
                 )
                 
-                # 创建图谱构建服务
-                builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
-                
+                # 创建图谱构建服务（BYOK：用使用者自己的 LLM/embedding 设定）
+                builder = GraphBuilderService(user_llm_config=llm_config)
+
+                # 建图前预检：确认使用者的 LLM 设定同时能做结构化输出抽取与 embedding
+                task_manager.update_task(
+                    task_id,
+                    message=t('progress.precheckingLlm'),
+                    progress=3
+                )
+                precheck_ok, precheck_reason = builder.precheck()
+                if not precheck_ok:
+                    raise RuntimeError(precheck_reason)
+
                 # 分块
                 task_manager.update_task(
                     task_id,
@@ -400,12 +407,12 @@ def build_graph():
                     progress=5
                 )
                 chunks = TextProcessor.split_text(
-                    text, 
-                    chunk_size=chunk_size, 
+                    text,
+                    chunk_size=chunk_size,
                     overlap=chunk_overlap
                 )
                 total_chunks = len(chunks)
-                
+
                 # 创建图谱
                 task_manager.update_task(
                     task_id,
@@ -413,11 +420,13 @@ def build_graph():
                     progress=10
                 )
                 graph_id = builder.create_graph(name=graph_name)
-                
-                # 更新项目的graph_id
+
+                # 更新项目的 graph_id（此时只是分配了一个新 ID，还没有任何数据写入
+                # FalkorDB；embedding metadata 要等 add_text_batches 真正成功后才写，
+                # 见下方，避免建图失败却把 metadata 覆写成这次失败尝试的供应商）
                 project.graph_id = graph_id
                 ProjectManager.save_project(project)
-                
+
                 # 设置本体
                 task_manager.update_task(
                     task_id,
@@ -425,46 +434,38 @@ def build_graph():
                     progress=15
                 )
                 builder.set_ontology(graph_id, ontology)
-                
+
                 # 添加文本（progress_callback 签名是 (msg, progress_ratio)）
                 def add_progress_callback(msg, progress_ratio):
-                    progress = 15 + int(progress_ratio * 40)  # 15% - 55%
+                    progress = 15 + int(progress_ratio * 80)  # 15% - 95%
                     task_manager.update_task(
                         task_id,
                         message=msg,
                         progress=progress
                     )
-                
+
                 task_manager.update_task(
                     task_id,
                     message=t('progress.addingChunks', count=total_chunks),
                     progress=15
                 )
-                
-                episode_uuids = builder.add_text_batches(
-                    graph_id, 
+
+                builder.add_text_batches(
+                    graph_id,
                     chunks,
                     batch_size=3,
                     progress_callback=add_progress_callback
                 )
-                
-                # 等待Zep处理完成（查询每个episode的processed状态）
-                task_manager.update_task(
-                    task_id,
-                    message=t('progress.waitingZepProcess'),
-                    progress=55
-                )
-                
-                def wait_progress_callback(msg, progress_ratio):
-                    progress = 55 + int(progress_ratio * 35)  # 55% - 90%
-                    task_manager.update_task(
-                        task_id,
-                        message=msg,
-                        progress=progress
-                    )
-                
-                builder._wait_for_episodes(episode_uuids, wait_progress_callback)
-                
+
+                # add_text_batches 成功完成才代表这次建图真正成功——现在才把
+                # embedding metadata 写回项目，供之后所有对这个 graph_id 的向量
+                # 相关操作（含下面马上要调用的 get_graph_data 自身）反查比对。
+                # 重新建图（含换模型）时这里会用新值覆写旧的 embedding_provider/model。
+                embedding_meta = builder.get_embedding_metadata()
+                project.embedding_provider = embedding_meta["embedding_provider"]
+                project.embedding_model = embedding_meta["embedding_model"]
+                ProjectManager.save_project(project)
+
                 # 获取图谱数据
                 task_manager.update_task(
                     task_id,
@@ -472,11 +473,11 @@ def build_graph():
                     progress=95
                 )
                 graph_data = builder.get_graph_data(graph_id)
-                
+
                 # 更新项目状态
                 project.status = ProjectStatus.GRAPH_COMPLETED
                 ProjectManager.save_project(project)
-                
+
                 node_count = graph_data.get("node_count", 0)
                 edge_count = graph_data.get("edge_count", 0)
                 build_logger.info(f"[{task_id}] 图谱构建完成: graph_id={graph_id}, 节点={node_count}, 边={edge_count}")
@@ -497,19 +498,22 @@ def build_graph():
                 )
                 
             except Exception as e:
-                # 更新项目状态为失败
-                build_logger.error(f"[{task_id}] 图谱构建失败: {str(e)}")
-                build_logger.debug(traceback.format_exc())
-                
+                # 更新项目状态为失败（错误信息一律先经过 redact_secrets 遮罩，
+                # 避免用户的 LLM API Key 明文进入 log 或存到 project.json/task 记录）
+                safe_error = redact_secrets(str(e))
+                safe_traceback = redact_secrets(traceback.format_exc())
+                build_logger.error(f"[{task_id}] 图谱构建失败: {safe_error}")
+                build_logger.debug(safe_traceback)
+
                 project.status = ProjectStatus.FAILED
-                project.error = str(e)
+                project.error = safe_error
                 ProjectManager.save_project(project)
-                
+
                 task_manager.update_task(
                     task_id,
                     status=TaskStatus.FAILED,
-                    message=t('progress.buildFailed', error=str(e)),
-                    error=traceback.format_exc()
+                    message=t('progress.buildFailed', error=safe_error),
+                    error=safe_traceback
                 )
         
         # 启动后台线程
@@ -571,56 +575,48 @@ def list_tasks():
 # ============== 图谱数据接口 ==============
 
 @graph_bp.route('/data/<graph_id>', methods=['GET'])
+@require_llm_config
 def get_graph_data(graph_id: str):
     """
     获取图谱数据（节点和边）
     """
     try:
-        if not Config.ZEP_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": t('api.zepApiKeyMissing')
-            }), 500
-        
-        builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
+        llm_config = get_current_llm_config()
+        builder = GraphBuilderService(user_llm_config=llm_config)
         graph_data = builder.get_graph_data(graph_id)
-        
+
         return jsonify({
             "success": True,
             "data": graph_data
         })
-        
+
     except Exception as e:
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": redact_secrets(str(e)),
+            "traceback": redact_secrets(traceback.format_exc())
         }), 500
 
 
 @graph_bp.route('/delete/<graph_id>', methods=['DELETE'])
 def delete_graph(graph_id: str):
     """
-    删除Zep图谱
+    删除图谱
+
+    纯 FalkorDB 结构性操作，不需要使用者的 LLM 设定（见
+    graph_builder.delete_graph_by_id 的说明），所以这个接口不要求 LLM 配置。
     """
     try:
-        if not Config.ZEP_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": t('api.zepApiKeyMissing')
-            }), 500
-        
-        builder = GraphBuilderService(api_key=Config.ZEP_API_KEY)
-        builder.delete_graph(graph_id)
-        
+        delete_graph_by_id(graph_id)
+
         return jsonify({
             "success": True,
             "message": t('api.graphDeleted', id=graph_id)
         })
-        
+
     except Exception as e:
         return jsonify({
             "success": False,
-            "error": str(e),
-            "traceback": traceback.format_exc()
+            "error": redact_secrets(str(e)),
+            "traceback": redact_secrets(traceback.format_exc())
         }), 500

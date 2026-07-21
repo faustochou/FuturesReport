@@ -43,6 +43,13 @@ class Project:
     # 图谱信息（接口2完成后填充）
     graph_id: Optional[str] = None
     graph_build_task_id: Optional[str] = None
+
+    # 建图时使用的 embedding 供应商/模型（Graphiti 迁移新增，additive）。
+    # 用于之后所有对同一 graph_id 的向量相关操作（搜索、模拟记忆更新、增量写入）
+    # 比对当前用户 LLM 设定是否一致，防止跨供应商向量空间混用导致语义搜索静默劣化。
+    # 见 app/services/graphiti_factory.py 的 check_embedding_consistency()。
+    embedding_provider: Optional[str] = None
+    embedding_model: Optional[str] = None
     
     # 配置
     simulation_requirement: Optional[str] = None
@@ -66,6 +73,8 @@ class Project:
             "analysis_summary": self.analysis_summary,
             "graph_id": self.graph_id,
             "graph_build_task_id": self.graph_build_task_id,
+            "embedding_provider": self.embedding_provider,
+            "embedding_model": self.embedding_model,
             "simulation_requirement": self.simulation_requirement,
             "chunk_size": self.chunk_size,
             "chunk_overlap": self.chunk_overlap,
@@ -91,6 +100,8 @@ class Project:
             analysis_summary=data.get('analysis_summary'),
             graph_id=data.get('graph_id'),
             graph_build_task_id=data.get('graph_build_task_id'),
+            embedding_provider=data.get('embedding_provider'),
+            embedding_model=data.get('embedding_model'),
             simulation_requirement=data.get('simulation_requirement'),
             chunk_size=data.get('chunk_size', 500),
             chunk_overlap=data.get('chunk_overlap', 50),
@@ -194,6 +205,23 @@ class ProjectManager:
         
         return Project.from_dict(data)
     
+    @classmethod
+    def find_project_by_graph_id(cls, graph_id: str) -> Optional[Project]:
+        """反查 graph_id 对应的项目。多处 Graphiti 相关操作（搜索、模拟记忆更新等）
+        只拿得到 graph_id，需要靠这个方法找回项目以读取 embedding_provider/model
+        做一致性校验（见 graphiti_factory.check_embedding_consistency）。
+
+        线性扫描所有 project.json：本地自架部署项目数量小，这不是热路径。
+        """
+        if not graph_id:
+            return None
+        cls._ensure_projects_dir()
+        for project_id in os.listdir(cls.PROJECTS_DIR):
+            project = cls.get_project(project_id)
+            if project and project.graph_id == graph_id:
+                return project
+        return None
+
     @classmethod
     def list_projects(cls, limit: int = 50) -> List[Project]:
         """

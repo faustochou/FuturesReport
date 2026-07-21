@@ -55,30 +55,25 @@ def optimize_interview_prompt(prompt: str) -> str:
 # ============== 实体读取接口 ==============
 
 @simulation_bp.route('/entities/<graph_id>', methods=['GET'])
+@require_llm_config
 def get_graph_entities(graph_id: str):
     """
     获取图谱中的所有实体（已过滤）
-    
+
     只返回符合预定义实体类型的节点（Labels不只是Entity的节点）
-    
+
     Query参数：
         entity_types: 逗号分隔的实体类型列表（可选，用于进一步过滤）
         enrich: 是否获取相关边信息（默认true）
     """
     try:
-        if not Config.ZEP_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": t('api.zepApiKeyMissing')
-            }), 500
-        
         entity_types_str = request.args.get('entity_types', '')
         entity_types = [t.strip() for t in entity_types_str.split(',') if t.strip()] if entity_types_str else None
         enrich = request.args.get('enrich', 'true').lower() == 'true'
-        
+
         logger.info(f"获取图谱实体: graph_id={graph_id}, entity_types={entity_types}, enrich={enrich}")
-        
-        reader = ZepEntityReader()
+
+        reader = ZepEntityReader(get_current_llm_config())
         result = reader.filter_defined_entities(
             graph_id=graph_id,
             defined_entity_types=entity_types,
@@ -100,16 +95,11 @@ def get_graph_entities(graph_id: str):
 
 
 @simulation_bp.route('/entities/<graph_id>/<entity_uuid>', methods=['GET'])
+@require_llm_config
 def get_entity_detail(graph_id: str, entity_uuid: str):
     """获取单个实体的详细信息"""
     try:
-        if not Config.ZEP_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": t('api.zepApiKeyMissing')
-            }), 500
-        
-        reader = ZepEntityReader()
+        reader = ZepEntityReader(get_current_llm_config())
         entity = reader.get_entity_with_context(graph_id, entity_uuid)
         
         if not entity:
@@ -133,18 +123,13 @@ def get_entity_detail(graph_id: str, entity_uuid: str):
 
 
 @simulation_bp.route('/entities/<graph_id>/by-type/<entity_type>', methods=['GET'])
+@require_llm_config
 def get_entities_by_type(graph_id: str, entity_type: str):
     """获取指定类型的所有实体"""
     try:
-        if not Config.ZEP_API_KEY:
-            return jsonify({
-                "success": False,
-                "error": t('api.zepApiKeyMissing')
-            }), 500
-        
         enrich = request.args.get('enrich', 'true').lower() == 'true'
-        
-        reader = ZepEntityReader()
+
+        reader = ZepEntityReader(get_current_llm_config())
         entities = reader.get_entities_by_type(
             graph_id=graph_id,
             entity_type=entity_type,
@@ -480,7 +465,7 @@ def prepare_simulation():
         # 这样前端在调用prepare后立即就能获取到预期Agent总数
         try:
             logger.info(f"同步获取实体数量: graph_id={state.graph_id}")
-            reader = ZepEntityReader()
+            reader = ZepEntityReader(llm_config)
             # 快速读取实体（不需要边信息，只统计数量）
             filtered_preview = reader.filter_defined_entities(
                 graph_id=state.graph_id,
@@ -1383,6 +1368,7 @@ def download_simulation_script(script_name: str):
 # ============== Profile生成接口（独立使用） ==============
 
 @simulation_bp.route('/generate-profiles', methods=['POST'])
+@require_llm_config
 def generate_profiles():
     """
     直接从图谱生成OASIS Agent Profile（不创建模拟）
@@ -1408,21 +1394,29 @@ def generate_profiles():
         entity_types = data.get('entity_types')
         use_llm = data.get('use_llm', True)
         platform = data.get('platform', 'reddit')
-        
-        reader = ZepEntityReader()
+
+        llm_config = get_current_llm_config()
+
+        reader = ZepEntityReader(llm_config)
         filtered = reader.filter_defined_entities(
             graph_id=graph_id,
             defined_entity_types=entity_types,
             enrich_with_edges=True
         )
-        
+
         if filtered.filtered_count == 0:
             return jsonify({
                 "success": False,
                 "error": t('api.noMatchingEntities')
             }), 400
-        
-        generator = OasisProfileGenerator()
+
+        generator = OasisProfileGenerator(
+            api_key=llm_config.get("api_key"),
+            base_url=llm_config.get("base_url"),
+            model_name=llm_config.get("model"),
+            provider=llm_config.get("provider"),
+            graph_id=graph_id,
+        )
         profiles = generator.generate_profiles_from_entities(
             entities=filtered.entities,
             use_llm=use_llm

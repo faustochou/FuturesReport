@@ -55,6 +55,14 @@ backend/logs/
 
 # 上传文件
 backend/uploads/
+/uploads/
 
 # Docker 数据
 data/
+
+# AI 工具本机自动产生的技能设定（每台机器/每个工具各自安装，不应纳入版控）
+.agents/
+.lingma/
+.pi/
+.trae/
+skills-lock.json

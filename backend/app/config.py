@@ -39,9 +39,12 @@ class Config:
     REPORT_LLM_BASE_URL = os.environ.get('REPORT_LLM_BASE_URL') or LLM_BASE_URL
     REPORT_LLM_MODEL_NAME = os.environ.get('REPORT_LLM_MODEL_NAME') or LLM_MODEL_NAME
     
-    # Zep配置
-    ZEP_API_KEY = os.environ.get('ZEP_API_KEY')
-    
+    # FalkorDB 配置（圖譜引擎，取代 Zep Cloud；LLM/embedding 為 BYOK，不在此設定，
+    # 見 app/services/graphiti_factory.py 直接讀取這幾個環境變數）
+    FALKORDB_HOST = os.environ.get('FALKORDB_HOST', 'localhost')
+    FALKORDB_PORT = os.environ.get('FALKORDB_PORT', '6379')
+    FALKORDB_PASSWORD = os.environ.get('FALKORDB_PASSWORD')
+
     # 数据库配置
     # Production:  DATABASE_URL=postgresql://user:pass@host:5432/dbname
     # Development: leave empty → SQLite under USER_DATA_DIR
@@ -96,9 +99,11 @@ class Config:
     
     @classmethod
     def validate(cls) -> list[str]:
-        """验证必要配置"""
+        """验证必要配置
+
+        图谱引擎（FalkorDB）与 LLM 均为 BYOK/per-user 或带默认值，没有平台级的
+        必填密钥需要在这里检查；保留这个方法签名供未来需要时使用。
+        """
         errors: list[str] = []
-        if not cls.ZEP_API_KEY:
-            errors.append("ZEP_API_KEY 未配置")
         return errors
 

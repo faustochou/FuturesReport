@@ -8,18 +8,21 @@ Zep检索工具服务
 3. QuickSearch（简单搜索）- 快速检索
 """
 
+import asyncio
 import time
 import json
 from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 
-from zep_cloud.client import Zep
+from graphiti_core.nodes import EntityNode as GraphitiEntityNode
+from graphiti_core.search.search_config_recipes import EDGE_HYBRID_SEARCH_RRF, NODE_HYBRID_SEARCH_RRF
 
 from ..config import Config
 from ..utils.logger import get_logger
 from ..utils.llm_client import LLMClient
 from ..utils.locale import get_locale, t
 from ..utils.zep_paging import fetch_all_nodes, fetch_all_edges
+from .graphiti_factory import build_graphiti, enforce_embedding_consistency, redact_secrets
 
 logger = get_logger('futuresreport.zep_tools')
 
@@ -422,15 +425,27 @@ class ZepToolsService:
     MAX_RETRIES = 3
     RETRY_DELAY = 2.0
     
-    def __init__(self, api_key: Optional[str] = None, llm_client: Optional[LLMClient] = None):
-        self.api_key = api_key or Config.ZEP_API_KEY
-        if not self.api_key:
-            raise ValueError("ZEP_API_KEY 未配置")
-        
-        self.client = Zep(api_key=self.api_key)
+    def __init__(self, user_llm_config: Dict[str, str], llm_client: Optional[LLMClient] = None):
+        if not user_llm_config or not user_llm_config.get("api_key"):
+            raise ValueError(t('api.llmConfigMissing'))
+        self.user_llm_config = user_llm_config
+        # 不快取单一 Graphiti 实例：FalkorDB 的底层 async redis 连线绑定在建立
+        # 当下的 event loop 上，这个 service 实例的生命周期内会呼叫多次不同的
+        # asyncio.run()（每个公开方法各自一次），沿用同一个 driver 会在第二次
+        # 呼叫时炸 "Event loop is closed"（Stage 5 端到端测试对真实 FalkorDB
+        # 实测到的）。改成每次呼叫前用 _get_graphiti() 现建一个新的。
         # LLM客户端用于InsightForge生成子问题
         self._llm_client = llm_client
         logger.info(t("console.zepToolsInitialized"))
+
+    def _get_graphiti(self, graph_id: str):
+        # graph_id 必须传入：FalkorDB 的多租戶隔離是「每個 group_id 對應一個
+        # 獨立命名的 FalkorDB 資料庫」（graphiti-core 的 add_episode() 內部會
+        # clone driver 成 database=group_id），不是同一張圖裡的篩選條件。
+        # build_graphiti() 沒收到 graph_id 就會退回預設的 'default_db'，跟
+        # 寫入時實際落地的圖對不上，查詢會拿到空結果（Stage 5 端到端測試對
+        # 真實 FalkorDB 實測到的問題）。
+        return build_graphiti(self.user_llm_config, graph_id)
     
     @property
     def llm(self) -> LLMClient:
@@ -461,75 +476,86 @@ class ZepToolsService:
         
         raise last_exception
     
+    @staticmethod
+    def _search_config_for_scope(scope: str, limit: int):
+        """按 scope 选择 RRF 搜索 recipe（NoOpRerankerClient 只支持 RRF 系搜索，
+        不引入 cross-encoder，见 graphiti_factory.py 的 NoOpRerankerClient 说明）。
+        recipe 是模块级单例，要先深拷贝再改 limit，避免污染全局共享的常量。
+        """
+        if scope == "nodes":
+            config = NODE_HYBRID_SEARCH_RRF.model_copy(deep=True)
+        elif scope == "edges":
+            config = EDGE_HYBRID_SEARCH_RRF.model_copy(deep=True)
+        else:
+            config = COMBINED_HYBRID_SEARCH_RRF.model_copy(deep=True)
+        config.limit = limit
+        return config
+
     def search_graph(
-        self, 
-        graph_id: str, 
-        query: str, 
+        self,
+        graph_id: str,
+        query: str,
         limit: int = 10,
         scope: str = "edges"
     ) -> SearchResult:
         """
         图谱语义搜索
-        
-        使用混合搜索（语义+BM25）在图谱中搜索相关信息。
-        如果Zep Cloud的search API不可用，则降级为本地关键词匹配。
-        
+
+        使用 Graphiti 的混合搜索（向量+BM25，RRF 融合排序）在图谱中搜索相关信息。
+        如果 Graphiti 搜索失败，则降级为本地关键词匹配。
+
         Args:
             graph_id: 图谱ID (Standalone Graph)
             query: 搜索查询
             limit: 返回结果数量
             scope: 搜索范围，"edges" 或 "nodes"
-            
+
         Returns:
             SearchResult: 搜索结果
         """
         logger.info(t("console.graphSearch", graphId=graph_id, query=query[:50]))
-        
-        # 尝试使用Zep Cloud Search API
+
+        enforce_embedding_consistency(self.user_llm_config, graph_id)
+
         try:
+            config = self._search_config_for_scope(scope, limit)
+            # 每次呼叫（含重试）都现建一个新的 Graphiti 实例，不要在 lambda 外
+            # 捕获同一个物件重复呼叫 asyncio.run()——否则重试时会对第一次呼叫
+            # 已经关闭的 event loop 报 "Event loop is closed"。
             search_results = self._call_with_retry(
-                func=lambda: self.client.graph.search(
-                    graph_id=graph_id,
-                    query=query,
-                    limit=limit,
-                    scope=scope,
-                    reranker="cross_encoder"
+                func=lambda: asyncio.run(
+                    self._get_graphiti(graph_id).search_(query=query, config=config, group_ids=[graph_id])
                 ),
                 operation_name=t("console.graphSearchOp", graphId=graph_id)
             )
-            
+
             facts = []
             edges = []
             nodes = []
-            
-            # 解析边搜索结果
-            if hasattr(search_results, 'edges') and search_results.edges:
-                for edge in search_results.edges:
-                    if hasattr(edge, 'fact') and edge.fact:
-                        facts.append(edge.fact)
-                    edges.append({
-                        "uuid": getattr(edge, 'uuid_', None) or getattr(edge, 'uuid', ''),
-                        "name": getattr(edge, 'name', ''),
-                        "fact": getattr(edge, 'fact', ''),
-                        "source_node_uuid": getattr(edge, 'source_node_uuid', ''),
-                        "target_node_uuid": getattr(edge, 'target_node_uuid', ''),
-                    })
-            
-            # 解析节点搜索结果
-            if hasattr(search_results, 'nodes') and search_results.nodes:
-                for node in search_results.nodes:
-                    nodes.append({
-                        "uuid": getattr(node, 'uuid_', None) or getattr(node, 'uuid', ''),
-                        "name": getattr(node, 'name', ''),
-                        "labels": getattr(node, 'labels', []),
-                        "summary": getattr(node, 'summary', ''),
-                    })
-                    # 节点摘要也算作事实
-                    if hasattr(node, 'summary') and node.summary:
-                        facts.append(f"[{node.name}]: {node.summary}")
-            
+
+            for edge in search_results.edges:
+                if edge.fact:
+                    facts.append(edge.fact)
+                edges.append({
+                    "uuid": edge.uuid,
+                    "name": edge.name or "",
+                    "fact": edge.fact or "",
+                    "source_node_uuid": edge.source_node_uuid,
+                    "target_node_uuid": edge.target_node_uuid,
+                })
+
+            for node in search_results.nodes:
+                nodes.append({
+                    "uuid": node.uuid,
+                    "name": node.name or "",
+                    "labels": node.labels or [],
+                    "summary": node.summary or "",
+                })
+                if node.summary:
+                    facts.append(f"[{node.name}]: {node.summary}")
+
             logger.info(t("console.searchComplete", count=len(facts)))
-            
+
             return SearchResult(
                 facts=facts,
                 edges=edges,
@@ -537,9 +563,9 @@ class ZepToolsService:
                 query=query,
                 total_count=len(facts)
             )
-            
+
         except Exception as e:
-            logger.warning(t("console.zepSearchApiFallback", error=str(e)))
+            logger.warning(t("console.zepSearchApiFallback", error=redact_secrets(str(e))))
             # 降级：使用本地关键词匹配搜索
             return self._local_search(graph_id, query, limit, scope)
     
@@ -659,13 +685,12 @@ class ZepToolsService:
         """
         logger.info(t("console.fetchingAllNodes", graphId=graph_id))
 
-        nodes = fetch_all_nodes(self.client, graph_id)
+        nodes = fetch_all_nodes(self._get_graphiti(graph_id).driver, graph_id)
 
         result = []
         for node in nodes:
-            node_uuid = getattr(node, 'uuid_', None) or getattr(node, 'uuid', None) or ""
             result.append(NodeInfo(
-                uuid=str(node_uuid) if node_uuid else "",
+                uuid=node.uuid or "",
                 name=node.name or "",
                 labels=node.labels or [],
                 summary=node.summary or "",
@@ -688,13 +713,12 @@ class ZepToolsService:
         """
         logger.info(t("console.fetchingAllEdges", graphId=graph_id))
 
-        edges = fetch_all_edges(self.client, graph_id)
+        edges = fetch_all_edges(self._get_graphiti(graph_id).driver, graph_id)
 
         result = []
         for edge in edges:
-            edge_uuid = getattr(edge, 'uuid_', None) or getattr(edge, 'uuid', None) or ""
             edge_info = EdgeInfo(
-                uuid=str(edge_uuid) if edge_uuid else "",
+                uuid=edge.uuid or "",
                 name=edge.name or "",
                 fact=edge.fact or "",
                 source_node_uuid=edge.source_node_uuid or "",
@@ -713,29 +737,31 @@ class ZepToolsService:
         logger.info(t("console.fetchedEdges", count=len(result)))
         return result
     
-    def get_node_detail(self, node_uuid: str) -> Optional[NodeInfo]:
+    def get_node_detail(self, graph_id: str, node_uuid: str) -> Optional[NodeInfo]:
         """
         获取单个节点的详细信息
-        
+
         Args:
+            graph_id: 图谱ID（FalkorDB 下每个 graph_id 是独立命名的资料库，
+                必须知道要查哪一个，不能只靠 node_uuid 定位）
             node_uuid: 节点UUID
-            
+
         Returns:
             节点信息或None
         """
         logger.info(t("console.fetchingNodeDetail", uuid=node_uuid[:8]))
-        
+
         try:
             node = self._call_with_retry(
-                func=lambda: self.client.graph.node.get(uuid_=node_uuid),
+                func=lambda: asyncio.run(GraphitiEntityNode.get_by_uuid(self._get_graphiti(graph_id).driver, node_uuid)),
                 operation_name=t("console.fetchNodeDetailOp", uuid=node_uuid[:8])
             )
-            
+
             if not node:
                 return None
-            
+
             return NodeInfo(
-                uuid=getattr(node, 'uuid_', None) or getattr(node, 'uuid', ''),
+                uuid=node.uuid,
                 name=node.name or "",
                 labels=node.labels or [],
                 summary=node.summary or "",
@@ -1043,7 +1069,7 @@ class ZepToolsService:
                 continue
             try:
                 # 单独获取每个相关节点的信息
-                node = self.get_node_detail(uuid)
+                node = self.get_node_detail(graph_id, uuid)
                 if node:
                     node_map[uuid] = node
                     entity_type = next((l for l in node.labels if l not in ["Entity", "Node"]), "实体")

@@ -8,6 +8,7 @@ OASIS Agent Profile生成器
 3. 区分个人实体和抽象群体实体
 """
 
+import asyncio
 import json
 import random
 import time
@@ -15,13 +16,12 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
 
-from zep_cloud.client import Zep
-
 from ..config import Config
 from ..utils.llm_client import LLMClient
 from ..utils.logger import get_logger
 from ..utils.locale import get_language_instruction, get_locale, set_locale, t
 from .zep_entity_reader import EntityNode, ZepEntityReader
+from .graphiti_factory import build_graphiti, enforce_embedding_consistency, redact_secrets
 
 logger = get_logger('futuresreport.oasis_profile')
 
@@ -179,39 +179,52 @@ class OasisProfileGenerator:
     ]
     
     def __init__(
-        self, 
+        self,
         api_key: Optional[str] = None,
         base_url: Optional[str] = None,
         model_name: Optional[str] = None,
         provider: Optional[str] = None,
-        zep_api_key: Optional[str] = None,
         graph_id: Optional[str] = None
     ):
         self.provider = provider or Config.LLM_PROVIDER
         self.api_key = api_key or Config.LLM_API_KEY
         self.base_url = base_url or Config.LLM_BASE_URL
         self.model_name = model_name or Config.LLM_MODEL_NAME
-        
+
         if not self.api_key:
             raise ValueError("LLM_API_KEY 未配置")
-        
+
         self.llm_client = LLMClient(
             api_key=self.api_key,
             base_url=self.base_url,
             model=self.model_name,
             provider=self.provider
         )
-        
-        # Zep客户端用于检索丰富上下文
-        self.zep_api_key = zep_api_key or Config.ZEP_API_KEY
-        self.zep_client = None
+
+        # 图谱检索用同一套 BYOK 设定（provider/model/base_url/api_key），
+        # 不再需要独立的 Zep API Key——图谱检索与人设生成本来就该用同一个使用者的模型。
+        self.user_llm_config = {
+            "provider": self.provider,
+            "model": self.model_name,
+            "base_url": self.base_url,
+            "api_key": self.api_key,
+        }
         self.graph_id = graph_id
-        
-        if self.zep_api_key:
-            try:
-                self.zep_client = Zep(api_key=self.zep_api_key)
-            except Exception as e:
-                logger.warning(f"Zep客户端初始化失败: {e}")
+        # 不快取单一 Graphiti 实例：本 generator 会对多个实体各自调用一次
+        # _search_zep_for_entity（每次各自一次 asyncio.run()），沿用同一个
+        # driver 会在第二个实体开始检索时炸 "Event loop is closed"（Stage 5
+        # 端到端测试对真实 FalkorDB 实测到的）。改成每次检索前用
+        # _get_graphiti() 现建一个新的；这里先建一次只是为了让建构子本身
+        # 也验证一次 BYOK 设定能成功组装图谱检索客户端。
+        self._graphiti_ready = False
+        try:
+            build_graphiti(self.user_llm_config, graph_id)
+            self._graphiti_ready = True
+        except Exception as e:
+            logger.warning(f"图谱检索客户端初始化失败: {redact_secrets(str(e))}")
+
+    def _get_graphiti(self):
+        return build_graphiti(self.user_llm_config, self.graph_id)
     
     def generate_profile_from_entity(
         self, 
@@ -289,130 +302,90 @@ class OasisProfileGenerator:
     
     def _search_zep_for_entity(self, entity: EntityNode) -> Dict[str, Any]:
         """
-        使用Zep图谱混合搜索功能获取实体相关的丰富信息
-        
-        Zep没有内置混合搜索接口，需要分别搜索edges和nodes然后合并结果。
-        使用并行请求同时搜索，提高效率。
-        
+        使用 Graphiti 混合搜索功能获取实体相关的丰富信息（边搜索 + 节点搜索并行）。
+
         Args:
             entity: 实体节点对象
-            
+
         Returns:
             包含facts, node_summaries, context的字典
         """
-        import concurrent.futures
-        
-        if not self.zep_client:
-            return {"facts": [], "node_summaries": [], "context": ""}
-        
-        entity_name = entity.name
-        
+        from graphiti_core.search.search_config_recipes import (
+            EDGE_HYBRID_SEARCH_RRF,
+            NODE_HYBRID_SEARCH_RRF,
+        )
+
         results = {
             "facts": [],
             "node_summaries": [],
             "context": ""
         }
-        
-        # 必须有graph_id才能进行搜索
-        if not self.graph_id:
-            logger.debug(f"跳过Zep检索：未设置graph_id")
+
+        if not self._graphiti_ready or not self.graph_id:
+            logger.debug("跳过图谱检索：客户端未就绪或未设置 graph_id")
             return results
-        
-        comprehensive_query = t('progress.zepSearchQuery', name=entity_name)
-        
-        def search_edges():
-            """搜索边（事实/关系）- 带重试机制"""
-            max_retries = 3
-            last_exception = None
-            delay = 2.0
-            
-            for attempt in range(max_retries):
-                try:
-                    return self.zep_client.graph.search(
-                        query=comprehensive_query,
-                        graph_id=self.graph_id,
-                        limit=30,
-                        scope="edges",
-                        reranker="rrf"
-                    )
-                except Exception as e:
-                    last_exception = e
-                    if attempt < max_retries - 1:
-                        logger.debug(f"Zep边搜索第 {attempt + 1} 次失败: {str(e)[:80]}, 重试中...")
-                        time.sleep(delay)
-                        delay *= 2
-                    else:
-                        logger.debug(f"Zep边搜索在 {max_retries} 次尝试后仍失败: {e}")
-            return None
-        
-        def search_nodes():
-            """搜索节点（实体摘要）- 带重试机制"""
-            max_retries = 3
-            last_exception = None
-            delay = 2.0
-            
-            for attempt in range(max_retries):
-                try:
-                    return self.zep_client.graph.search(
-                        query=comprehensive_query,
-                        graph_id=self.graph_id,
-                        limit=20,
-                        scope="nodes",
-                        reranker="rrf"
-                    )
-                except Exception as e:
-                    last_exception = e
-                    if attempt < max_retries - 1:
-                        logger.debug(f"Zep节点搜索第 {attempt + 1} 次失败: {str(e)[:80]}, 重试中...")
-                        time.sleep(delay)
-                        delay *= 2
-                    else:
-                        logger.debug(f"Zep节点搜索在 {max_retries} 次尝试后仍失败: {e}")
-            return None
-        
+
         try:
-            # 并行执行edges和nodes搜索
-            with concurrent.futures.ThreadPoolExecutor(max_workers=2) as executor:
-                edge_future = executor.submit(search_edges)
-                node_future = executor.submit(search_nodes)
-                
-                # 获取结果
-                edge_result = edge_future.result(timeout=30)
-                node_result = node_future.result(timeout=30)
-            
-            # 处理边搜索结果
+            enforce_embedding_consistency(self.user_llm_config, self.graph_id)
+        except Exception as e:
+            logger.warning(f"图谱检索一致性检查未通过，跳过检索: {redact_secrets(str(e))}")
+            return results
+
+        entity_name = entity.name
+        comprehensive_query = t('progress.zepSearchQuery', name=entity_name)
+
+        async def _search_both():
+            edge_config = EDGE_HYBRID_SEARCH_RRF.model_copy(deep=True)
+            edge_config.limit = 30
+            node_config = NODE_HYBRID_SEARCH_RRF.model_copy(deep=True)
+            node_config.limit = 20
+
+            # 用同一个新建的 Graphiti 实例做这两次并行搜索——两者都在同一个
+            # asyncio.gather() 底下、同一个 event loop 内执行，不会有跨 loop
+            # 重用连线的问题；但每次调用本方法（对应每个不同实体）都要现建一个
+            # 新实例，不能跨方法调用快取（见 __init__ 的说明）。
+            graphiti = self._get_graphiti()
+            return await asyncio.gather(
+                graphiti.search_(query=comprehensive_query, config=edge_config, group_ids=[self.graph_id]),
+                graphiti.search_(query=comprehensive_query, config=node_config, group_ids=[self.graph_id]),
+                return_exceptions=True,
+            )
+
+        try:
+            edge_result, node_result = asyncio.run(_search_both())
+
             all_facts = set()
-            if edge_result and hasattr(edge_result, 'edges') and edge_result.edges:
+            if not isinstance(edge_result, BaseException) and edge_result.edges:
                 for edge in edge_result.edges:
-                    if hasattr(edge, 'fact') and edge.fact:
+                    if edge.fact:
                         all_facts.add(edge.fact)
+            elif isinstance(edge_result, BaseException):
+                logger.debug(f"图谱边搜索失败: {redact_secrets(str(edge_result))[:80]}")
             results["facts"] = list(all_facts)
-            
-            # 处理节点搜索结果
+
             all_summaries = set()
-            if node_result and hasattr(node_result, 'nodes') and node_result.nodes:
+            if not isinstance(node_result, BaseException) and node_result.nodes:
                 for node in node_result.nodes:
-                    if hasattr(node, 'summary') and node.summary:
+                    if node.summary:
                         all_summaries.add(node.summary)
-                    if hasattr(node, 'name') and node.name and node.name != entity_name:
+                    if node.name and node.name != entity_name:
                         all_summaries.add(f"相关实体: {node.name}")
+            elif isinstance(node_result, BaseException):
+                logger.debug(f"图谱节点搜索失败: {redact_secrets(str(node_result))[:80]}")
             results["node_summaries"] = list(all_summaries)
-            
-            # 构建综合上下文
+
             context_parts = []
             if results["facts"]:
                 context_parts.append("事实信息:\n" + "\n".join(f"- {f}" for f in results["facts"][:20]))
             if results["node_summaries"]:
                 context_parts.append("相关实体:\n" + "\n".join(f"- {s}" for s in results["node_summaries"][:10]))
             results["context"] = "\n\n".join(context_parts)
-            
-            logger.info(f"Zep混合检索完成: {entity_name}, 获取 {len(results['facts'])} 条事实, {len(results['node_summaries'])} 个相关节点")
-            
-        except concurrent.futures.TimeoutError:
-            logger.warning(f"Zep检索超时 ({entity_name})")
+
+            logger.info(f"图谱混合检索完成: {entity_name}, 获取 {len(results['facts'])} 条事实, {len(results['node_summaries'])} 个相关节点")
+
         except Exception as e:
-            logger.warning(f"Zep检索失败 ({entity_name}): {e}")
-        
+            logger.warning(f"图谱检索失败 ({entity_name}): {redact_secrets(str(e))}")
+
         return results
     
     def _build_entity_context(self, entity: EntityNode) -> str:
