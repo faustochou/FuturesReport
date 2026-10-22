@@ -24,7 +24,6 @@ def _version_history_path() -> str:
 
 def _runtime_commit() -> str:
     for key in (
-        "ZEABUR_GIT_COMMIT_SHA",
         "VERCEL_GIT_COMMIT_SHA",
         "SOURCE_COMMIT",
         "GIT_COMMIT_SHA",
@@ -36,7 +35,7 @@ def _runtime_commit() -> str:
 
 
 def _webhook_url() -> str:
-    # Build from SITE_URL env var (required behind Zeabur reverse proxy, because
+    # Build from SITE_URL env var (required behind a reverse proxy, because
     # request.host_url returns the internal container address, not the public domain).
     site_url = os.environ.get("SITE_URL", "").strip().rstrip("/")
     if not site_url:

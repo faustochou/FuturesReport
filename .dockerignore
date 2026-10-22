@@ -1,4 +1,4 @@
-# Docker build context exclusions for smaller, faster, reliable Zeabur builds
+# Docker build context exclusions for smaller, faster, reliable image builds
 
 # Dependencies
 node_modules

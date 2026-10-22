@@ -21,9 +21,9 @@ def _init_database(logger) -> None:
 
     Schema management strategy
     --------------------------
-    Production (Zeabur + PostgreSQL):
+    Production (Docker + PostgreSQL):
         Alembic migrations run BEFORE this function is called — via the
-        Dockerfile CMD (`alembic upgrade head && npm run dev`).
+        Dockerfile CMD (`alembic upgrade head && python run.py`).
         create_tables() is a no-op here because all tables already exist.
 
     Local development (SQLite fallback, no Dockerfile):
@@ -36,6 +36,45 @@ def _init_database(logger) -> None:
     create_tables()          # no-op when alembic already ran; safety net for local dev
     seed_subscription_tiers()
     logger.info("数据库初始化完成")
+
+
+def _register_frontend(app) -> None:
+    """Serve the production frontend build (frontend/dist) from Flask.
+
+    The Docker image runs `vite build` at image-build time, so in production a single
+    process serves both the SPA and the /api routes. When frontend/dist does not exist
+    (local development) nothing is registered and the Vite dev server (port 3000, which
+    proxies /api to this backend) is used as before.
+    """
+    dist_dir = os.path.abspath(
+        os.environ.get('FRONTEND_DIST_DIR')
+        or os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'dist')
+    )
+    if not os.path.isfile(os.path.join(dist_dir, 'index.html')):
+        return
+
+    from flask import abort, send_from_directory
+    from werkzeug.security import safe_join
+
+    @app.route('/', defaults={'path': ''})
+    @app.route('/<path:path>')
+    def frontend(path):
+        # Unknown API paths must stay a 404, never fall through to the SPA shell.
+        if path == 'api' or path.startswith('api/'):
+            abort(404)
+
+        full_path = safe_join(dist_dir, path) if path else None
+        if full_path and os.path.isfile(full_path):
+            response = send_from_directory(dist_dir, path)
+            # Vite emits content-hashed files under /assets, safe to cache for a year.
+            if path.startswith('assets/'):
+                response.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+            return response
+
+        # SPA fallback (vue-router history mode): index.html must never be cached.
+        response = send_from_directory(dist_dir, 'index.html')
+        response.headers['Cache-Control'] = 'no-cache'
+        return response
 
 
 def create_app(config_class=Config):
@@ -97,7 +136,7 @@ def create_app(config_class=Config):
     app.register_blueprint(simulation_bp, url_prefix='/api/simulation')
     app.register_blueprint(report_bp, url_prefix='/api/report')
     
-    # 健康检查 (K8s / Zeabur 探针友好 + 资源报告)
+    # 健康检查 (容器编排 / K8s 探针友好 + 资源报告)
     @app.route('/health')
     def health():
         from datetime import datetime
@@ -118,7 +157,10 @@ def create_app(config_class=Config):
         except Exception:
             data['memory'] = {'note': 'psutil not available'}
         return data
-    
+
+    # 生产环境：由 Flask 直接提供前端正式建置（frontend/dist）；开发环境不存在 dist 时略过
+    _register_frontend(app)
+
     if should_log_startup:
         logger.info("Futures Report Backend 启动完成")
     

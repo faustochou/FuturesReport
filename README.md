@@ -125,7 +125,7 @@ LLM_MODEL_NAME=qwen-plus
 # LLM/embedding calls are BYOK — each user's own model settings, not a platform-wide key.
 # Source deployment: run FalkorDB locally first, e.g.:
 #   docker run -p 6379:6379 -p 3000:3000 -d falkordb/falkordb:latest
-# Docker/Zeabur deployment: FALKORDB_HOST/PORT/PASSWORD are auto-injected, leave unset here.
+# Docker / Coolify deployment: FALKORDB_HOST/PORT/PASSWORD are auto-injected, leave unset here.
 # FALKORDB_HOST=localhost
 # FALKORDB_PORT=6379
 # FALKORDB_PASSWORD=
@@ -176,37 +176,37 @@ cp .env.example .env
 docker compose up -d
 ```
 
-Reads `.env` from root directory by default, maps ports `3000 (frontend) / 5001 (backend)`
+Reads `.env` from root directory by default, maps port `5001` (Flask serves the API and the built frontend)
 
 > Mirror address for faster pulling is provided as comments in `docker-compose.yml`, replace if needed.
 
-### Option 3: Zeabur Deployment
+### Option 3: Self-hosted with Coolify
 
-Zeabur's container filesystem is **ephemeral** — every redeploy wipes the container's local disk. FuturesReport stores project files, simulation data, and reports under `backend/uploads/` by default, so without a persistent volume, a redeploy will delete that folder while database records (simulation history, reports) survive, leaving orphaned references like "Project not found: proj_xxx" when opening old simulation records.
+FuturesReport runs well on a single VPS (4 vCPU / 8 GB RAM is plenty) managed by [Coolify](https://coolify.io). The container filesystem is **ephemeral** - every redeploy wipes it - so persistent storage matters.
 
-To avoid this, configure persistent storage before deploying on Zeabur:
+1. **PostgreSQL** - create a PostgreSQL resource and point the application's `DATABASE_URL` at its internal URL. Enable scheduled backups.
+2. **Application** - create an application from this repository with the **Dockerfile** build pack and set *Ports Exposes* to `5001` (Flask serves both the API and the built frontend). The first build downloads PyTorch/CUDA wheels (several GB) and takes a while; the Dockerfile already raises uv's HTTP timeout.
+3. **Persistent storage** - mount volumes at `/data` and `/app/backend/uploads`. Project files, simulation data and reports live under `backend/uploads/` by default; without a volume they are deleted on every redeploy while database records survive, leaving orphaned references such as "Project not found: proj_xxx".
+4. **Environment variables** (keep secrets runtime-only): `DATABASE_URL`, `SECRET_KEY`, `SITE_URL` (your public URL, used to build the Stripe webhook URL), `LLM_*`, and the FalkorDB variables below. `FLASK_DEBUG` is already `false` in the image.
 
-1. On your backend service, add a **Volume** (persistent volume) and mount it into the container, e.g. mount path `/data/uploads`.
-2. Set the environment variable `UPLOAD_FOLDER=/data/uploads` on the backend service, so all project/simulation/report files are written to the mounted volume instead of the ephemeral container disk.
-3. (Optional but recommended) Also point `USER_DATA_DIR` at a path under the same volume (e.g. `/data`) if you rely on the SQLite fallback instead of `DATABASE_URL`, so the database file persists across redeploys too.
+> `SECRET_KEY` is **required** - use a long random value. It signs login tokens and encrypts stored API keys and payment settings. Changing it later logs everyone out and requires re-entering the stored keys.
 
-Without this volume + `UPLOAD_FOLDER` configuration, project/simulation/report files will be lost on every redeploy even though database records remain — this is a known limitation of ephemeral container storage, not a bug in the application logic.
+#### FalkorDB on Coolify
 
-#### FalkorDB on Zeabur
+The knowledge-graph engine (Graphiti + FalkorDB) needs its own persistent service:
 
-The knowledge-graph engine (Graphiti + FalkorDB, replacing Zep Cloud) needs its own persistent service:
+1. Add a Docker Image resource `falkordb/falkordb:latest` in the same Coolify project. **Do not give it a public domain or published port.**
+2. Mount a persistent volume at **`/var/lib/falkordb/data`** - the image's actual persistence directory (verify with `redis-cli CONFIG GET dir`). Mounting `/data` does not persist graphs.
+3. Set a password: `REDIS_ARGS=--requirepass <your-password>`.
+4. On the application set `FALKORDB_HOST=<the FalkorDB resource's internal hostname>`, `FALKORDB_PORT=6379` and `FALKORDB_PASSWORD=<the same password>`.
 
-1. In your Zeabur project, add a service from the prebuilt **FalkorDB** template (or a generic Docker service using image `falkordb/falkordb:latest`, exposing port `6379`).
-2. Attach a **Volume** to that service and mount it at `/data` — this is FalkorDB's actual persistence directory (confirmed against [docs.falkordb.com/operations/docker](https://docs.falkordb.com/operations/docker)), same requirement as the uploads volume above: without it, every redeploy wipes all built knowledge graphs.
-3. Set a real password: on the FalkorDB service, set `REDIS_ARGS=--requirepass <your-password>`.
-4. On the **backend** service, set:
-   - `FALKORDB_HOST=<the FalkorDB service's internal hostname>` (Zeabur exposes inter-service DNS names, similar to how `DATABASE_URL` reaches the Postgres service)
-   - `FALKORDB_PORT=6379`
-   - `FALKORDB_PASSWORD=<the same password from step 3>`
+LLM/embedding calls made against FalkorDB are BYOK (each user's own model settings, read from their account), so no platform-wide LLM key is needed for the graph engine itself.
 
-LLM/embedding calls made against FalkorDB are BYOK (each user's own model settings, read from their account), so no platform-wide LLM key needs to be configured for the graph engine itself — only the FalkorDB connection details above.
+> Keep FalkorDB private: the backend only needs to reach it over Coolify's internal network.
 
-> ⚠️ **Close the public port after testing.** If you temporarily expose FalkorDB's port to the public internet (e.g. Zeabur's "Networking → Public Domain/TCP Proxy") to run integration tests from your local machine, turn that exposure back off once testing is done. The backend should only ever reach FalkorDB over Zeabur's internal network — there's no reason for the graph database to be reachable from outside the project at all in normal operation.
+#### Automatic deployment
+
+In the GitHub repository add a webhook (content type `application/json`, *push* events only) pointing at your Coolify instance's `/webhooks/source/github/events/manual` URL, and set the same secret on the application in Coolify. Pushes to the configured branch then redeploy automatically.
 
 ## 📄 Acknowledgments
 

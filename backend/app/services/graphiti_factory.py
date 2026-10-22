@@ -124,7 +124,7 @@ DEFAULT_LLM_CONCURRENCY_LIMIT = 6
 
 # FalkorDriver 自己組裝的 FalkorDB client 沒有設 socket_timeout /
 # socket_connect_timeout（底層 redis-py 預設值是 None，代表不設限）。Stage 5
-# 端到端測試對真實 Zeabur FalkorDB 實測到：在一次測試流程中陸續開了十來個
+# 端到端測試對真實遠端 FalkorDB 實測到：在一次測試流程中陸續開了十來個
 # FalkorDriver（本專案「每次操作現建一個新 driver」的既定設計，見
 # build_graphiti() 的說明）之後，後續某次查詢會直接卡住、完全沒有任何例外或
 # 逾時，一路等到手動砍掉進程——很可能是伺服器端連線數到了某個門檻後不主動
@@ -389,7 +389,7 @@ def build_graphiti(user_llm_config: Dict[str, str], graph_id: Optional[str] = No
     `self.driver = self.driver.clone(database=group_id)`），也就是說每個
     group_id 實際上對應 FalkorDB 裡一個「獨立命名的圖」，不是同一張圖裡的
     一個篩選條件。這件事在 Stage 2/3 設計時沒有對著真實 FalkorDB 驗證過，
-    Stage 5 端到端測試對真實 Zeabur FalkorDB 實測才發現：write 端經
+    Stage 5 端到端測試對真實遠端 FalkorDB 實測才發現：write 端經
     add_episode() 的內部 clone 邏輯寫進了名為 graph_id 的圖，但如果 read 端
     （fetch_all_nodes / search_ 等）用一個沒有指定 database 的全新 driver
     （落到預設的 'default_db'），就會查到完全不同、空的圖，造成「寫入回報

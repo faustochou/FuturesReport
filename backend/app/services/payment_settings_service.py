@@ -6,7 +6,7 @@ Single source of truth for reading/writing payment-related configuration
 used by shineyang's lib/payment/gateway-factory.ts:
 
     1. site_settings table (admin-editable, encrypted for secrets)
-    2. os.environ fallback (Zeabur / .env deployment)
+    2. os.environ fallback (Docker / .env deployment)
 
 Sensitive values (Stripe secret key, webhook secret) are encrypted at rest
 with a Fernet key derived from Config.SECRET_KEY. Nothing in this module

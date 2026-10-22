@@ -36,13 +36,15 @@ services:
       # 而不是留空——留空会让 FalkorDB 启动时的 --requirepass 参数没有值。
       REDIS_ARGS: "--requirepass ${FALKORDB_PASSWORD:-falkordb123}"
     volumes:
-      - falkordb_data:/data   # graph data survives container rebuilds (confirmed against
-                              # docs.falkordb.com/operations/docker — /data is correct)
+      # graph data survives container rebuilds. The current falkordb/falkordb image persists
+      # to /var/lib/falkordb/data (check `redis-cli CONFIG GET dir`); mounting /data would
+      # silently NOT persist anything.
+      - falkordb_data:/var/lib/falkordb/data
     # 只给内部服务用（同一个 docker 网络内用 service 名 falkordb 连线），
     # 不对外开放端口；本机除错需要时再取消注释
     # ports:
     #   - "6379:6379"
-    #   - "3001:3000"   # FalkorDB 内建的图谱浏览器 UI（3000 跟前端撞了，改映射 3001）
+    #   - "3001:3000"   # FalkorDB 内建的图谱浏览器 UI（容器内部是 3000，映射到本机 3001）
     healthcheck:
       test: ["CMD", "redis-cli", "-a", "${FALKORDB_PASSWORD:-falkordb123}", "--no-auth-warning", "ping"]
       interval: 5s
@@ -67,8 +69,7 @@ services:
       FALKORDB_PORT: "6379"
       FALKORDB_PASSWORD: ${FALKORDB_PASSWORD:-falkordb123}
     ports:
-      - "3000:3000"
-      - "5001:5001"
+      - "5001:5001"   # Flask serves both the API and the built frontend on 5001
     restart: unless-stopped
     depends_on:
       db:

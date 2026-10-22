@@ -12,7 +12,7 @@
 |------|------|
 | `backend/run.py` | Flask 啟動入口，`python run.py` 啟動服務；讀取 FLASK_HOST / FLASK_PORT |
 | `backend/app/__init__.py` | `create_app()` 工廠函式；藍圖註冊、CORS、DB 初始化、SimulationRunner 清理鉤子 |
-| `backend/alembic/` | DB migration；`alembic upgrade head` 在 Docker/Zeabur 啟動時執行 |
+| `backend/alembic/` | DB migration；`alembic upgrade head` 在 Docker / Coolify 啟動時執行 |
 
 ---
 
@@ -128,7 +128,7 @@
 
 | Method | Path | 描述 |
 |--------|------|------|
-| GET | `/health` | K8s/Zeabur 探針；回傳 CPU/記憶體資訊 |
+| GET | `/health` | 容器編排 / K8s 探針；回傳 CPU/記憶體資訊 |
 
 ---
 
@@ -255,7 +255,7 @@
 | `DATABASE_URL` | 空 = SQLite；設定 = PostgreSQL |
 | `FLASK_HOST` / `FLASK_PORT` / `FLASK_DEBUG` | Flask 啟動參數 |
 | `LLM_PROVIDER` / `LLM_API_KEY` / `LLM_BASE_URL` / `LLM_MODEL_NAME` | 預設 LLM（次要，用戶自設為主） |
-| `SITE_URL` | Zeabur 反向代理後的公開 domain（webhook URL 組裝） |
+| `SITE_URL` | 反向代理後的公開 domain（webhook URL 組裝） |
 | `USER_DATA_DIR` | 上傳/模擬資料目錄 |
 | `SIM_MAX_AGENTS` / `SIM_MAX_ROUNDS` / `LLM_CONCURRENCY_LIMIT` 等 | 模擬資源限制 |
 
@@ -265,7 +265,6 @@
 
 | 檔案 | 用途 |
 |------|------|
-| `zbpack.json` | Zeabur 部署設定 |
 | `Dockerfile` | 容器映像建構 |
 | `docker-compose.yml` | 本地開發容器組合 |
 | `.dockerignore` | Docker 忽略清單 |

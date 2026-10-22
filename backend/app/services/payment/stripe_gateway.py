@@ -36,7 +36,7 @@ class StripeGateway(PaymentGateway):
     ):
         if not secret_key:
             raise RuntimeError(
-                "STRIPE_SECRET_KEY 未設定。請在後台「金流設定」或 .env / Zeabur 環境變數中填入。"
+                "STRIPE_SECRET_KEY 未設定。請在後台「金流設定」或 .env / 部署環境的環境變數中填入。"
             )
         self._secret_key = secret_key
         self._webhook_secret = webhook_secret

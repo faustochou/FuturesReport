@@ -8,10 +8,9 @@ const envHosts = (process.env.VITE_ALLOWED_HOSTS || process.env.ALLOWED_HOSTS ||
   .filter(Boolean)
 
 const hostsFromUrls = [
-  process.env.ZEABUR_WEB_URL,
-  process.env.ZEABUR_URL,
   process.env.PUBLIC_URL,
-  process.env.APP_URL
+  process.env.APP_URL,
+  process.env.SITE_URL
 ]
   .map(value => {
     if (!value) return null
@@ -24,10 +23,9 @@ const hostsFromUrls = [
   })
   .filter(Boolean)
 
+// Only the dev server (`npm run dev`) checks this list; production serves the built
+// frontend from Flask (see Dockerfile), so no host allow-listing is needed there.
 const allowedHosts = [
-  'report.nexorasocial.net',
-  '.zeabur.app',
-  '.zeabur.com',
   ...envHosts,
   ...hostsFromUrls
 ]

@@ -125,7 +125,7 @@ LLM_MODEL_NAME=qwen-plus
 # LLM/embedding 呼叫採用 BYOK——用每個使用者自己的模型設定，不是平台統一的 key。
 # 原始碼部署：先在本機跑一個 FalkorDB，例如：
 #   docker run -p 6379:6379 -p 3000:3000 -d falkordb/falkordb:latest
-# Docker/Zeabur 部署：FALKORDB_HOST/PORT/PASSWORD 由部署環境自動注入，此處留空即可。
+# Docker / Coolify 部署：FALKORDB_HOST/PORT/PASSWORD 由部署環境自動注入，此處留空即可。
 # FALKORDB_HOST=localhost
 # FALKORDB_PORT=6379
 # FALKORDB_PASSWORD=
@@ -176,37 +176,37 @@ cp .env.example .env
 docker compose up -d
 ```
 
-預設會讀取根目錄下的 `.env`，並映射連接埠 `3000（前端）/5001（後端）`
+預設會讀取根目錄下的 `.env`，並映射連接埠 `5001`（Flask 同時提供 API 與前端正式建置）
 
 > 在 `docker-compose.yml` 中已透過註解提供加速映像檔位址，可依需求替換
 
-### 三、Zeabur 部署
+### 三、使用 Coolify 自架
 
-Zeabur 的容器檔案系統是**暫時性的（ephemeral）**：每次重新部署都會清空容器本機磁碟。FuturesReport 預設將專案檔案、模擬資料、報告存放在 `backend/uploads/` 目錄下，若未設定持久化卷，重新部署會把該目錄整個清空，而資料庫中的紀錄（模擬歷史、報告）不受影響，於是開啟舊的推演記錄時會出現「專案不存在：proj_xxx」這類孤兒引用錯誤。
+FuturesReport 一台 VPS 就能跑（4 vCPU / 8 GB RAM 綽綽有餘），並用 [Coolify](https://coolify.io) 管理。容器檔案系統是**暫時性的（ephemeral）**：每次重新部署都會清空容器本機磁碟，所以持久化儲存很重要。
 
-為避免此問題，請在 Zeabur 上部署前設定持久化儲存：
+1. **PostgreSQL**：建立 PostgreSQL 資源，並把應用程式的 `DATABASE_URL` 指向它的內部連線網址，記得開啟排程備份。
+2. **應用程式**：以本儲存庫建立應用程式，Build Pack 選 **Dockerfile**，*Ports Exposes* 設為 `5001`（Flask 同時提供 API 與前端正式建置）。第一次建置會下載 PyTorch / CUDA 套件（數 GB），需要一些時間；Dockerfile 已經調高 uv 的 HTTP 逾時。
+3. **持久化儲存**：把磁碟掛載到 `/data` 與 `/app/backend/uploads`。專案檔案、模擬資料與報告預設存放在 `backend/uploads/`，沒有持久化磁碟的話，每次重新部署都會被刪除，但資料庫紀錄還在，就會出現開啟舊紀錄時「Project not found: proj_xxx」這類孤立參照。
+4. **環境變數**（機密只在執行時提供）：`DATABASE_URL`、`SECRET_KEY`、`SITE_URL`（公開網址，用來組裝 Stripe Webhook 網址）、`LLM_*`，以及下方的 FalkorDB 變數。映像檔已預設 `FLASK_DEBUG=false`。
 
-1. 在後端服務上新增一個 **Volume（持久化卷）**，掛載到容器內，例如掛載路徑 `/data/uploads`。
-2. 在後端服務上設定環境變數 `UPLOAD_FOLDER=/data/uploads`，讓所有專案／模擬／報告檔案都寫入掛載的持久化卷，而非暫時性的容器磁碟。
-3. （可選但建議）若你使用 SQLite 回退方案而非 `DATABASE_URL`，也請將 `USER_DATA_DIR` 指向同一持久化卷下的路徑（例如 `/data`），使資料庫檔案同樣能在重新部署後保留。
+> `SECRET_KEY` **必填**，請使用夠長的隨機字串。它用來簽發登入憑證，並加密儲存的 API 金鑰與金流設定。事後更換會讓所有人被登出，且已儲存的金鑰需要重新輸入。
 
-若未設定持久化卷與 `UPLOAD_FOLDER`，即使資料庫紀錄仍然存在，專案／模擬／報告檔案也會在每次重新部署後遺失——這是容器暫時性儲存的已知限制，並非應用程式邏輯的缺陷。
+#### Coolify 上的 FalkorDB
 
-#### Zeabur 上的 FalkorDB
+知識圖譜引擎（Graphiti + FalkorDB）需要自己的持久化服務：
 
-圖譜知識引擎（Graphiti + FalkorDB，取代 Zep Cloud）需要一個獨立的持久化服務：
+1. 在同一個 Coolify 專案新增 Docker Image 資源 `falkordb/falkordb:latest`，**不要設定公開網域或對外埠**。
+2. 把持久化磁碟掛載到 **`/var/lib/falkordb/data`**，這是映像檔實際的持久化目錄（可用 `redis-cli CONFIG GET dir` 確認）。掛載 `/data` 並不會保存圖譜。
+3. 設定密碼：`REDIS_ARGS=--requirepass <你的密碼>`。
+4. 在應用程式設定 `FALKORDB_HOST=<FalkorDB 資源的內部主機名稱>`、`FALKORDB_PORT=6379`、`FALKORDB_PASSWORD=<同一組密碼>`。
 
-1. 在 Zeabur 專案中，從預建的 **FalkorDB** 範本新增一個服務（或用通用 Docker 服務、映像檔填 `falkordb/falkordb:latest`，開放 `6379` 埠）。
-2. 給這個服務掛一個 **Volume**，掛載路徑設為 `/data`——這是 FalkorDB 實際的持久化目錄（已對照 [docs.falkordb.com/operations/docker](https://docs.falkordb.com/operations/docker) 官方文件確認），跟上面 uploads 卷同樣重要：沒掛的話每次重新部署都會清空已建好的所有圖譜。
-3. 設一個真實密碼：在 FalkorDB 服務上設定 `REDIS_ARGS=--requirepass <你的密碼>`。
-4. 在**後端**服務上設定：
-   - `FALKORDB_HOST=<FalkorDB 服務的內部主機名稱>`（Zeabur 會提供服務間的內部 DNS 名稱，跟後端連到 Postgres 服務的方式一樣）
-   - `FALKORDB_PORT=6379`
-   - `FALKORDB_PASSWORD=<步驟 3 設定的同一組密碼>`
+對 FalkorDB 的 LLM / 嵌入呼叫是 BYOK（使用每位使用者自己帳號中的模型設定），所以圖譜引擎本身不需要平台級的 LLM 金鑰。
 
-對 FalkorDB 的 LLM/embedding 呼叫採用 BYOK（每個使用者自己帳號設定裡的模型），所以圖譜引擎本身不需要設定任何平台級 LLM key——只需要上面這幾個 FalkorDB 連線設定。
+> 請讓 FalkorDB 保持私有：後端只需要透過 Coolify 的內部網路連線。
 
-> ⚠️ **測試完成後請關閉對外開放的埠。** 如果為了從本機跑整合測試而臨時把 FalkorDB 的埠開放到公網（例如 Zeabur 的「Networking → Public Domain/TCP Proxy」），測試結束後務必把這個對外開放關掉。正常運作時後端應該只透過 Zeabur 內部網路連線到 FalkorDB，圖譜資料庫完全沒有理由能被專案外部存取。
+#### 自動部署
+
+在 GitHub 儲存庫新增 Webhook（Content type 選 `application/json`，只勾選 *push* 事件），網址填 Coolify 的 `/webhooks/source/github/events/manual`，並在 Coolify 的應用程式設定相同的密鑰。之後推送到設定的分支就會自動重新部署。
 
 ## 💳 如何設定 Stripe 金流
 
@@ -238,7 +238,7 @@ FuturesReport 支援 Stripe 訂閱制（目前開放 Lite 方案）。
 
 ### 4. 填入環境變數
 
-在 `.env` 中填入以下變數（或在 Zeabur / Docker 環境中設定）：
+在 `.env` 中填入以下變數（或在 Coolify / Docker 環境中設定）：
 
 ```env
 STRIPE_SECRET_KEY=sk_test_your_secret_key

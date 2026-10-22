@@ -52,7 +52,7 @@ class Config:
 
     # 文件上传配置
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB
-    # 生产环境（如 Zeabur）容器文件系统是 ephemeral 的，务必通过 UPLOAD_FOLDER
+    # 生产环境（如 Coolify / Docker）容器文件系统是 ephemeral 的，务必通过 UPLOAD_FOLDER
     # 环境变量指向一个持久化卷（persistent volume）挂载点，否则 redeploy 后
     # projects/simulations/reports 等数据会全部丢失。未设置时回退到仓库内的
     # backend/uploads，保持本机开发行为不变。
