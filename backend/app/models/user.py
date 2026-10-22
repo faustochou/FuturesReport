@@ -160,6 +160,7 @@ def _orm_to_dict(user: User) -> Dict[str, Any]:
         "is_active": user.is_active,
         "created_at": _dt(user.created_at),
         "updated_at": _dt(user.updated_at),
+        "platform_model_id": user.platform_model_id,
         "llm_config": {
             "provider": llm.provider,
             "model": llm.model,
@@ -297,6 +298,8 @@ class UserManager:
     def public_user(cls, user: Dict[str, Any]) -> Dict[str, Any]:
         llm_config = user.get("llm_config") or {}
         sub = user.get("subscription")
+        own_configured = bool(llm_config.get("api_key_cipher"))
+        platform_model = cls._active_platform_model(user)
         return {
             "user_id": user.get("user_id"),
             "username": user.get("username"),
@@ -304,7 +307,14 @@ class UserManager:
             "is_admin": user.get("role") == "admin",
             "is_active": user.get("is_active", True),
             "created_at": user.get("created_at"),
-            "llm_configured": bool(llm_config.get("api_key_cipher")),
+            # True when the user can run simulations: own API key saved, or an
+            # entitled platform model selected.
+            "llm_configured": own_configured or platform_model is not None,
+            "own_llm_configured": own_configured,
+            # "platform" when the site-provided model is the one in use.
+            "llm_source": "platform" if platform_model else ("own" if own_configured else None),
+            "platform_model": platform_model,
+            "can_use_platform_models": cls._can_use_platform_models(user),
             "llm": {
                 "provider": llm_config.get("provider"),
                 "model": llm_config.get("model"),
@@ -314,6 +324,21 @@ class UserManager:
             } if llm_config else None,
             "subscription": sub,
         }
+
+    @classmethod
+    def _can_use_platform_models(cls, user: Dict[str, Any]) -> bool:
+        from ..services import platform_model_service
+        return platform_model_service.user_can_use_platform_models(user)
+
+    @classmethod
+    def _active_platform_model(cls, user: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """The platform model this user has selected AND is still entitled to
+        (enabled model, active Premium/Pro subscription or admin); else None."""
+        from ..services import platform_model_service
+        model_id = user.get("platform_model_id")
+        if not model_id or not platform_model_service.user_can_use_platform_models(user):
+            return None
+        return platform_model_service.get_public_model(model_id)
 
     # ------------------------------------------------------------------
     # CRUD
@@ -535,6 +560,8 @@ class UserManager:
             cfg.api_key_cipher = new_cipher
             cfg.api_key_hint = new_hint
             cfg.updated_at = datetime.utcnow()
+            # Saving your own API settings means "use my own API from now on".
+            user.platform_model_id = None
             user.touch()
             db.flush()
             result = _orm_to_dict(user)
@@ -542,10 +569,52 @@ class UserManager:
         return result
 
     @classmethod
+    def set_platform_model(
+        cls, user_id: str, platform_model_id: Optional[int]
+    ) -> Dict[str, Any]:
+        """Select a site-provided model (or None to go back to the user's own API)."""
+        from ..services import platform_model_service
+
+        with get_db() as db:
+            user = db.execute(
+                select(User).where(User.user_id == user_id)
+            ).scalar_one_or_none()
+            if not user:
+                raise ValueError("User not found.")
+
+            if platform_model_id is None:
+                user.platform_model_id = None
+            else:
+                if not platform_model_service.user_can_use_platform_models(
+                    _orm_to_dict(user)
+                ):
+                    raise PermissionError(
+                        "Platform models require an active Premium subscription."
+                    )
+                if platform_model_service.get_public_model(platform_model_id) is None:
+                    raise ValueError("Platform model not found or disabled.")
+                user.platform_model_id = platform_model_id
+
+            user.touch()
+            db.flush()
+            return _orm_to_dict(user)
+
+    @classmethod
     def get_llm_config(cls, user_id: str) -> Optional[Dict[str, str]]:
         user = cls.get_user(user_id)
         if not user:
             return None
+
+        # A selected, still-entitled platform model wins over the user's own key.
+        if user.get("platform_model_id"):
+            from ..services import platform_model_service
+            if platform_model_service.user_can_use_platform_models(user):
+                platform_cfg = platform_model_service.get_credentials(
+                    user["platform_model_id"]
+                )
+                if platform_cfg:
+                    return platform_cfg
+
         cfg = user.get("llm_config")
         if not cfg or not cfg.get("api_key_cipher"):
             return None

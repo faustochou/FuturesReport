@@ -119,7 +119,6 @@ def seed_subscription_tiers() -> None:
                 display_name="Lite",
                 is_available=True,
                 feature_flags={
-                    "max_agents": 100,
                     "sim_runs_per_month": 10,
                     "report_export": True,
                 },
@@ -129,7 +128,11 @@ def seed_subscription_tiers() -> None:
                 tier_code="premium",
                 display_name="Premium",
                 is_available=False,
-                feature_flags={},
+                feature_flags={
+                    "sim_runs_per_month": 10,
+                    "report_export": True,
+                    "platform_models": True,
+                },
                 updated_at=now,
             ),
             SubscriptionTier(

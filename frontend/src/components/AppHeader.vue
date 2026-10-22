@@ -9,6 +9,9 @@
 
       <!-- 右側功能區（桌機：始終可見） -->
       <div class="header-right">
+        <a class="nav-link" :class="{ active: route.path === '/subscription' }" href="/subscription" @click.prevent="router.push('/subscription')">
+          {{ t('auth.subscriptionLink') }}
+        </a>
         <LanguageSwitcher />
         <AuthPanel />
       </div>
@@ -31,6 +34,11 @@
     <Transition name="menu-slide">
       <div v-if="mobileOpen" class="mobile-menu">
         <div class="mobile-menu-item">
+          <a class="nav-link" :class="{ active: route.path === '/subscription' }" href="/subscription" @click.prevent="goSubscription">
+            {{ t('auth.subscriptionLink') }}
+          </a>
+        </div>
+        <div class="mobile-menu-item">
           <LanguageSwitcher />
         </div>
         <div class="mobile-menu-item">
@@ -43,15 +51,23 @@
 
 <script setup>
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
+import { useI18n } from 'vue-i18n'
 import AppLogo from './AppLogo.vue'
 import LanguageSwitcher from './LanguageSwitcher.vue'
 import AuthPanel from './AuthPanel.vue'
 
 const router = useRouter()
+const route = useRoute()
+const { t } = useI18n()
 
 /* 手機展開狀態 */
 const mobileOpen = ref(false)
+
+const goSubscription = () => {
+  mobileOpen.value = false
+  router.push('/subscription')
+}
 </script>
 
 <style scoped>
@@ -96,6 +112,31 @@ const mobileOpen = ref(false)
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+/* ── 訂閱方案連結 ── */
+.nav-link {
+  display: inline-flex;
+  align-items: center;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  color: #111;
+  font-family: 'Space Grotesk', 'Noto Sans TC', system-ui, sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.nav-link:hover,
+.nav-link.active {
+  border-color: #111;
+}
+
+.mobile-menu-item .nav-link {
+  width: 100%;
+  justify-content: space-between;
 }
 
 /* ── 漢堡按鈕（預設隱藏，手機才顯示） ── */

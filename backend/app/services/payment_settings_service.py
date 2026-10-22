@@ -98,6 +98,18 @@ def _decrypt(token: str) -> Optional[str]:
         return None
 
 
+def encrypt_secret(value: str) -> str:
+    """Public wrapper so other services (e.g. platform models) reuse the same
+    SECRET_KEY-derived Fernet encryption instead of rolling their own."""
+    return _encrypt(value)
+
+
+def decrypt_secret(token: str) -> Optional[str]:
+    """Counterpart of encrypt_secret; returns None if the token cannot be read
+    (typically because SECRET_KEY changed)."""
+    return _decrypt(token)
+
+
 # ---------------------------------------------------------------------------
 # Read / write
 # ---------------------------------------------------------------------------

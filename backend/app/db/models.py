@@ -67,6 +67,11 @@ class User(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
     )
+    # Premium/Pro users may pick a site-provided model (PlatformModel.id) instead
+    # of their own API key. NULL = use the user's own llm_config. Deliberately a
+    # plain integer (no FK) so deleting a platform model never blocks, and so the
+    # SQLite migration needs no table rebuild; dangling ids are ignored on read.
+    platform_model_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     llm_config: Mapped["LlmConfig"] = relationship(
         "LlmConfig",
@@ -132,7 +137,7 @@ class SubscriptionTier(Base):
     display_name: Mapped[str] = mapped_column(String(100), nullable=False)
     stripe_price_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     is_available: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
-    # JSON dict: {"max_agents": 100, "sim_runs_per_month": 10, ...}
+    # JSON dict: {"sim_runs_per_month": 10, "platform_models": true, ...}
     feature_flags: Mapped[Dict[str, Any]] = mapped_column(
         _JsonColumn, nullable=False, default=dict
     )
@@ -277,6 +282,32 @@ class SiteSettings(Base):
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
     value: Mapped[Optional[str]] = mapped_column(Text, nullable=True, default="")
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
+
+
+# ---------------------------------------------------------------------------
+# PlatformModel  (site-provided LLM API, usable by Premium/Pro subscribers)
+# ---------------------------------------------------------------------------
+
+class PlatformModel(Base):
+    """A model + API key the site operator provides. Premium subscribers can
+    run simulations on it without bringing their own key. api_key_cipher is
+    Fernet-encrypted (see services/platform_model_service.py)."""
+    __tablename__ = "platform_models"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    label: Mapped[str] = mapped_column(String(100), nullable=False, default="")
+    base_url: Mapped[str] = mapped_column(String(512), nullable=False)
+    api_key_cipher: Mapped[str] = mapped_column(Text, nullable=False)
+    api_key_hint: Mapped[str] = mapped_column(String(50), nullable=False, default="")
+    is_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=datetime.utcnow
+    )
     updated_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=datetime.utcnow
     )

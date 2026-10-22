@@ -72,6 +72,12 @@ export const testPaymentConnection  = ()     => adminService.post('/api/admin/pa
 export const listAdminTiers       = ()               => adminService.get('/api/admin/subscription/tiers')
 export const updateAdminTier      = (code, data)     => adminService.put(`/api/admin/subscription/tiers/${code}`, data)
 
+// Platform models – site-provided LLM APIs for Premium subscribers
+export const listPlatformModels   = ()           => adminService.get('/api/admin/platform-models')
+export const createPlatformModel  = (data)       => adminService.post('/api/admin/platform-models', data)
+export const updatePlatformModel  = (id, data)   => adminService.put(`/api/admin/platform-models/${id}`, data)
+export const deletePlatformModel  = (id)         => adminService.delete(`/api/admin/platform-models/${id}`)
+
 // User subscription override (admin-granted, no Stripe)
 export const setUserSubscription  = (id, tier_code)  => adminService.put(`/api/admin/users/${id}/subscription`, { tier_code })
 

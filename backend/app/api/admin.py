@@ -11,6 +11,7 @@ from . import admin_bp
 from ..models.user import UserManager
 from ..utils.auth import current_admin, require_admin
 from ..services import payment_settings_service as pay_settings
+from ..services import platform_model_service
 from ..services import refund_service
 from ..services import subscription_service as sub_svc
 from ..services.payment import factory as payment_factory
@@ -443,3 +444,61 @@ def update_tier(tier_code: str):
         return jsonify({"success": False, "error": str(exc)}), 404
 
     return jsonify({"success": True, "data": {"tier": updated}})
+
+
+# ---------------------------------------------------------------------------
+# Platform models — site-provided LLM APIs for Premium subscribers
+# ---------------------------------------------------------------------------
+
+@admin_bp.route("/platform-models", methods=["GET"])
+@require_admin
+def list_platform_models():
+    return jsonify({
+        "success": True,
+        "data": {"models": platform_model_service.list_models()},
+    })
+
+
+@admin_bp.route("/platform-models", methods=["POST"])
+@require_admin
+def create_platform_model():
+    data = request.get_json() or {}
+    try:
+        created = platform_model_service.create_model(
+            provider=data.get("provider", ""),
+            model=data.get("model", ""),
+            api_key=data.get("api_key", ""),
+            label=data.get("label", ""),
+            base_url=data.get("base_url", ""),
+            is_enabled=data.get("is_enabled", True),
+        )
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    return jsonify({"success": True, "data": {"model": created}}), 201
+
+
+@admin_bp.route("/platform-models/<int:model_id>", methods=["PUT"])
+@require_admin
+def update_platform_model(model_id: int):
+    data = request.get_json() or {}
+    allowed = ("provider", "model", "label", "base_url", "api_key", "is_enabled")
+    fields = {k: data[k] for k in allowed if k in data}
+    if not fields:
+        return jsonify({"success": False, "error": "沒有可更新的欄位"}), 400
+    try:
+        updated = platform_model_service.update_model(model_id, **fields)
+    except LookupError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    except ValueError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 400
+    return jsonify({"success": True, "data": {"model": updated}})
+
+
+@admin_bp.route("/platform-models/<int:model_id>", methods=["DELETE"])
+@require_admin
+def delete_platform_model(model_id: int):
+    try:
+        platform_model_service.delete_model(model_id)
+    except LookupError as exc:
+        return jsonify({"success": False, "error": str(exc)}), 404
+    return jsonify({"success": True, "data": {}})

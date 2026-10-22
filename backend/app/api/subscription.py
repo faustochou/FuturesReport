@@ -44,6 +44,29 @@ def subscription_status():
 
 
 # ---------------------------------------------------------------------------
+# GET /api/subscription/tiers  (public – drives the /subscription pricing cards)
+# ---------------------------------------------------------------------------
+
+@subscription_bp.route("/tiers", methods=["GET"])
+def public_tiers():
+    """Which plans are currently open for purchase. No stripe ids, no flags."""
+    tiers = svc.get_all_tiers()
+    return jsonify({
+        "success": True,
+        "data": {
+            "tiers": [
+                {
+                    "tier_code": t["tier_code"],
+                    "display_name": t["display_name"],
+                    "is_available": bool(t["is_available"]) and bool(t["stripe_price_id"]),
+                }
+                for t in tiers
+            ]
+        },
+    })
+
+
+# ---------------------------------------------------------------------------
 # POST /api/subscription/create-checkout-session
 # ---------------------------------------------------------------------------
 
@@ -123,6 +146,10 @@ def stripe_webhook():
 
     event_type = event["type"]
     event_data = event["data"]
+    # stripe>=15 returns StripeObject (not a dict subclass, so no .get()); the
+    # handlers expect plain dicts.
+    if hasattr(event_data, "to_dict"):
+        event_data = event_data.to_dict()
 
     _HANDLERS = {
         "checkout.session.completed":      svc.handle_checkout_completed,

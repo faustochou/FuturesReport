@@ -1,5 +1,9 @@
 import service from './index'
 
+// Public (no login): which plans are currently open for purchase
+export const getPublicTiers = () =>
+  service.get('/api/subscription/tiers')
+
 export const getSubscriptionStatus = () =>
   service.get('/api/subscription/status')
 

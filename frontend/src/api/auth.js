@@ -20,6 +20,15 @@ export const updateLlmConfig = (data) => {
   return service.put('/api/auth/llm-config', data)
 }
 
+export const getPlatformModels = () => {
+  return service.get('/api/auth/platform-models')
+}
+
+// platformModelId = null switches back to the user's own API key
+export const selectPlatformModelApi = (platformModelId) => {
+  return service.put('/api/auth/platform-model', { platform_model_id: platformModelId })
+}
+
 export const logoutAccount = () => {
   return service.post('/api/auth/logout')
 }

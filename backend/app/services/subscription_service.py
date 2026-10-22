@@ -369,6 +369,24 @@ def handle_subscription_updated(event_data: Dict[str, Any]) -> None:
         period_end = (
             datetime.utcfromtimestamp(ts) if ts else row.current_period_end
         )
+
+        # Plan switch (e.g. Lite -> Premium via the customer portal): follow the
+        # price on the subscription to the tier that owns that price id.
+        items = (stripe_sub.get("items") or {}).get("data") or []
+        price_id = ((items[0].get("price") or {}).get("id")) if items else None
+        if price_id:
+            new_tier = db.execute(
+                select(SubscriptionTier).where(
+                    SubscriptionTier.stripe_price_id == price_id
+                )
+            ).scalar_one_or_none()
+            if new_tier is not None and new_tier.tier_code != row.tier_code:
+                logger.info(
+                    "[Webhook] 訂閱 %s 方案由 %s 變更為 %s",
+                    subscription_id, row.tier_code, new_tier.tier_code,
+                )
+                row.tier_code = new_tier.tier_code
+
         row.status = status
         row.current_period_end = period_end
         row.touch()

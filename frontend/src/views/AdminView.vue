@@ -128,7 +128,7 @@
               <div class="header-badges">
                 <span class="pill admin-pill" v-if="selectedUser.is_admin">Admin</span>
                 <span class="pill inactive-pill" v-if="!selectedUser.is_active">{{ $t('admin.alreadyDisabled') }}</span>
-                <span class="pill ready" v-if="selectedUser.llm_configured">
+                <span class="pill ready" v-if="selectedUser.own_llm_configured">
                   API Key: {{ selectedUser.llm?.api_key_hint }}
                 </span>
               </div>
@@ -515,6 +515,96 @@
         </div>
       </section>
 
+      <!-- ── Platform Models ── -->
+      <section v-if="activeTab === 'models'" class="settings-panel">
+        <div class="section-title">
+          <div>
+            <p class="eyebrow">{{ $t('admin.pmLabelEyebrow') }}</p>
+            <h2>{{ $t('admin.pmTitle') }}</h2>
+          </div>
+          <button class="icon-btn" type="button" @click="loadPlatformModels">↻</button>
+        </div>
+        <p class="hint">{{ $t('admin.pmDesc') }}</p>
+
+        <div class="tier-list pm-list">
+          <p v-if="!platformModels.length" class="muted">{{ $t('admin.pmEmpty') }}</p>
+          <div v-for="m in platformModels" :key="m.id" class="tier-card">
+            <div class="tier-card-header">
+              <div>
+                <strong class="tier-name">{{ m.label }}</strong>
+                <code class="tier-code">{{ m.provider_label }} · {{ m.model }}</code>
+              </div>
+              <span class="pill" :class="m.is_enabled ? 'ready' : 'unavail-pill'">
+                {{ m.is_enabled ? $t('admin.pmEnabledPill') : $t('admin.pmDisabledPill') }}
+              </span>
+            </div>
+            <p class="hint-note">{{ m.base_url }} · {{ m.api_key_hint }}</p>
+            <div class="inline-row pm-actions">
+              <label class="check-row">
+                <input type="checkbox" :checked="m.is_enabled" :disabled="pmLoading" @change="togglePlatformModel(m)" />
+                <span>{{ $t('admin.pmEnabled') }}</span>
+              </label>
+              <button class="action-btn" type="button" :disabled="pmLoading" @click="startEditPlatformModel(m)">{{ $t('admin.pmEdit') }}</button>
+              <button class="action-btn delete-btn" type="button" :disabled="pmLoading" @click="removePlatformModel(m)">{{ $t('admin.pmDelete') }}</button>
+            </div>
+          </div>
+        </div>
+
+        <form class="tier-card pm-form" @submit.prevent="savePlatformModel">
+          <div class="tier-card-header">
+            <strong class="tier-name">{{ pmEditingId ? $t('admin.pmEditTitle') : $t('admin.pmAddTitle') }}</strong>
+          </div>
+          <div class="tier-form">
+            <label>
+              <span>{{ $t('admin.pmProvider') }}</span>
+              <select v-model="pmForm.provider" @change="syncPmProvider">
+                <option v-for="(provider, key) in providers" :key="key" :value="key">{{ provider.label }}</option>
+              </select>
+            </label>
+            <label>
+              <span>{{ $t('admin.pmModel') }}</span>
+              <input v-model.trim="pmForm.model" list="pm-model-options" required autocomplete="off" />
+              <datalist id="pm-model-options">
+                <option v-for="model in pmProviderModels" :key="model" :value="model"></option>
+              </datalist>
+            </label>
+            <label>
+              <span>{{ $t('admin.pmDisplayName') }}</span>
+              <input v-model.trim="pmForm.label" :placeholder="$t('admin.pmDisplayNamePh')" autocomplete="off" />
+            </label>
+            <label>
+              <span>{{ $t('admin.pmBaseUrl') }}</span>
+              <input v-model.trim="pmForm.base_url" required autocomplete="off" />
+            </label>
+            <label>
+              <span>{{ $t('admin.pmApiKey') }}</span>
+              <input
+                v-model="pmForm.api_key"
+                type="password"
+                autocomplete="new-password"
+                :required="!pmEditingId"
+                :placeholder="pmEditingId ? $t('admin.pmApiKeyKeep') : ''"
+              />
+            </label>
+            <p class="hint-note">{{ $t('admin.pmSecurityHint') }}</p>
+            <label class="check-row">
+              <input type="checkbox" v-model="pmForm.is_enabled" />
+              <span>{{ $t('admin.pmEnabled') }}</span>
+            </label>
+            <div class="inline-row">
+              <button class="primary-btn" type="submit" :disabled="pmLoading">
+                {{ pmLoading ? $t('admin.saving') : (pmEditingId ? $t('admin.pmSave') : $t('admin.pmAdd')) }}
+              </button>
+              <button v-if="pmEditingId" class="action-btn" type="button" :disabled="pmLoading" @click="resetPlatformModelForm">
+                {{ $t('admin.pmCancel') }}
+              </button>
+            </div>
+          </div>
+        </form>
+        <p v-if="pmMessage" class="success-text">{{ pmMessage }}</p>
+        <p v-if="pmError" class="error-text">{{ pmError }}</p>
+      </section>
+
       <!-- ── Social Links ── -->
       <section v-if="activeTab === 'social'" class="settings-panel">
         <div class="section-title">
@@ -552,6 +642,8 @@ import { useI18n } from 'vue-i18n'
 import {
   adminLogin,
   changeUserRole,
+  createPlatformModel,
+  deletePlatformModel,
   deleteUser,
   getAdminAccessToken,
   getAdminMe,
@@ -561,6 +653,7 @@ import {
   getPaymentSettings,
   getVersionHistory,
   listAdminTiers,
+  listPlatformModels,
   refundUser,
   setAdminToken,
   setUserSubscription,
@@ -569,6 +662,7 @@ import {
   updateAdminSocialLinks,
   updateAdminTier,
   updateAdminUser,
+  updatePlatformModel,
   updatePaymentSettings,
 } from '../api/admin'
 import DEFAULT_PROVIDERS from '../config/providers'
@@ -583,6 +677,7 @@ const tabs = [
   { id: 'users',     labelKey: 'tabUsers' },
   { id: 'stripe',    labelKey: 'tabStripe' },
   { id: 'tiers',     labelKey: 'tabTiers' },
+  { id: 'models',    labelKey: 'tabPlatformModels' },
   { id: 'versions',  labelKey: 'tabVersions' },
   { id: 'social',    labelKey: 'tabSocial' },
 ]
@@ -643,6 +738,120 @@ const tierLoading = ref('')        // tier_code currently saving
 const tierMessages = reactive({})
 const tierErrors   = reactive({})
 
+// Platform models (site-provided LLM APIs shown to Premium subscribers)
+const platformModels  = ref([])
+const pmEditingId     = ref(null)
+const pmLoading       = ref(false)
+const pmMessage       = ref('')
+const pmError         = ref('')
+const pmForm          = reactive({
+  provider: 'openai', model: 'gpt-4o-mini', label: '',
+  base_url: 'https://api.openai.com/v1', api_key: '', is_enabled: true,
+})
+const pmProviderModels = computed(() => providers.value[pmForm.provider]?.models || [])
+
+const syncPmProvider = () => {
+  const provider = providers.value[pmForm.provider]
+  if (!provider) return
+  pmForm.model    = provider.default_model || provider.models?.[0] || ''
+  pmForm.base_url = provider.base_url || ''
+}
+
+const resetPlatformModelForm = () => {
+  pmEditingId.value = null
+  pmForm.provider = 'openai'
+  pmForm.label    = ''
+  pmForm.api_key  = ''
+  pmForm.is_enabled = true
+  syncPmProvider()
+}
+
+const loadPlatformModels = async () => {
+  pmError.value = ''
+  try {
+    const res = await listPlatformModels()
+    platformModels.value = res.data?.models || []
+  } catch (err) {
+    pmError.value = err.message || t('admin.pmLoadFailed')
+  }
+}
+
+const startEditPlatformModel = (m) => {
+  pmEditingId.value = m.id
+  pmForm.provider   = m.provider
+  pmForm.model      = m.model
+  pmForm.label      = m.label === m.model ? '' : m.label
+  pmForm.base_url   = m.base_url
+  pmForm.api_key    = ''
+  pmForm.is_enabled = m.is_enabled
+  pmMessage.value = ''
+  pmError.value   = ''
+}
+
+const savePlatformModel = async () => {
+  pmLoading.value = true
+  pmMessage.value = ''
+  pmError.value   = ''
+  try {
+    const payload = {
+      provider: pmForm.provider,
+      model: pmForm.model,
+      label: pmForm.label,
+      base_url: pmForm.base_url,
+      is_enabled: pmForm.is_enabled,
+    }
+    if (pmForm.api_key) payload.api_key = pmForm.api_key
+    if (pmEditingId.value) {
+      await updatePlatformModel(pmEditingId.value, payload)
+      pmMessage.value = t('admin.pmUpdated')
+    } else {
+      if (!pmForm.api_key) {
+        pmError.value = t('admin.pmKeyRequired')
+        return
+      }
+      await createPlatformModel(payload)
+      pmMessage.value = t('admin.pmAdded')
+    }
+    resetPlatformModelForm()
+    await loadPlatformModels()
+  } catch (err) {
+    pmError.value = err.message
+  } finally {
+    pmLoading.value = false
+  }
+}
+
+const togglePlatformModel = async (m) => {
+  pmLoading.value = true
+  pmMessage.value = ''
+  pmError.value   = ''
+  try {
+    await updatePlatformModel(m.id, { is_enabled: !m.is_enabled })
+    await loadPlatformModels()
+  } catch (err) {
+    pmError.value = err.message
+  } finally {
+    pmLoading.value = false
+  }
+}
+
+const removePlatformModel = async (m) => {
+  if (!window.confirm(t('admin.pmConfirmDelete', { name: m.label }))) return
+  pmLoading.value = true
+  pmMessage.value = ''
+  pmError.value   = ''
+  try {
+    await deletePlatformModel(m.id)
+    if (pmEditingId.value === m.id) resetPlatformModelForm()
+    pmMessage.value = t('admin.pmDeleted')
+    await loadPlatformModels()
+  } catch (err) {
+    pmError.value = err.message
+  } finally {
+    pmLoading.value = false
+  }
+}
+
 // User subscription override (admin)
 const subLoading = ref(false)
 const subMessage = ref('')
@@ -668,6 +877,7 @@ watch(activeTab, (tab) => {
   if (tab === 'users')     { loadUsers(); loadTiers() }
   if (tab === 'stripe')    loadPaymentSettings()
   if (tab === 'tiers')     loadTiers()
+  if (tab === 'models')    loadPlatformModels()
   if (tab === 'versions')  loadVersions()
   if (tab === 'social')    loadSocialLinks()
 })
@@ -1615,6 +1825,11 @@ input, select {
   display: block;
   margin-bottom: 8px;
 }
+
+.pm-list { margin-bottom: 14px; }
+.pm-actions { flex-wrap: wrap; align-items: center; margin-top: 10px; }
+.pm-actions .check-row { flex: 1 1 220px; }
+.pm-form { margin-top: 14px; }
 
 .unavail-pill {
   border-color: #c97c2e;

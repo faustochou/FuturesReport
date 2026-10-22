@@ -50,10 +50,57 @@
                 <strong>{{ authState.user.username }}</strong>
               </div>
               <div class="account-actions">
+                <button class="text-btn" type="button" @click="goSubscription">{{ t('auth.subscriptionLink') }}</button>
                 <button v-if="authState.user.is_admin" class="text-btn" type="button" @click="goAdmin">{{ t('auth.adminConsole') }}</button>
                 <button class="text-btn" type="button" @click="logout">{{ t('auth.logout') }}</button>
               </div>
             </div>
+
+            <!-- Site-provided models: Premium / Pro / admin only -->
+            <div v-if="authState.user.can_use_platform_models" class="platform-box">
+              <div class="eyebrow">{{ t('auth.platformModels') }}</div>
+              <template v-if="authState.platformModels.length">
+                <p class="platform-hint">{{ t('auth.platformModelsDesc') }}</p>
+                <label
+                  v-for="m in authState.platformModels"
+                  :key="m.id"
+                  class="platform-option"
+                  :class="{ active: activePlatformId === m.id }"
+                >
+                  <input
+                    type="radio"
+                    name="llm-source"
+                    :checked="activePlatformId === m.id"
+                    :disabled="authState.loading"
+                    @change="usePlatformModel(m.id)"
+                  />
+                  <span class="platform-option-text">
+                    <strong>{{ m.label }}</strong>
+                    <small>{{ m.provider_label }} · {{ m.model }}</small>
+                  </span>
+                </label>
+                <label class="platform-option" :class="{ active: !activePlatformId && authState.user.own_llm_configured }">
+                  <input
+                    type="radio"
+                    name="llm-source"
+                    :checked="!activePlatformId"
+                    :disabled="authState.loading || !authState.user.own_llm_configured"
+                    @change="usePlatformModel(null)"
+                  />
+                  <span class="platform-option-text"><strong>{{ t('auth.useOwnApi') }}</strong></span>
+                </label>
+                <div v-if="activePlatformId" class="llm-status ready">
+                  {{ t('auth.platformInUse', { label: authState.user.platform_model?.label }) }}
+                </div>
+              </template>
+              <p v-else class="platform-hint">{{ t('auth.noPlatformModels') }}</p>
+            </div>
+            <div v-else-if="authState.user.subscription" class="platform-box platform-upsell">
+              <p class="platform-hint">{{ t('auth.platformUpsell') }}</p>
+              <button class="text-btn" type="button" @click="goSubscription">{{ t('auth.subscriptionLink') }}</button>
+            </div>
+
+            <div v-if="authState.user.can_use_platform_models" class="eyebrow own-api-title">{{ t('auth.ownApiTitle') }}</div>
 
             <form class="form-stack" @submit.prevent="submitLlmConfig">
               <label>
@@ -87,8 +134,8 @@
                 />
               </label>
 
-              <div class="llm-status" :class="{ ready: authState.user.llm_configured }">
-                {{ authState.user.llm_configured ? t('auth.savedModel', { provider: authState.user.llm?.provider, model: authState.user.llm?.model }) : t('auth.apiKeyRequired') }}
+              <div class="llm-status" :class="{ ready: authState.user.own_llm_configured }">
+                {{ authState.user.own_llm_configured ? t('auth.savedModel', { provider: authState.user.llm?.provider, model: authState.user.llm?.model }) : t('auth.apiKeyRequired') }}
               </div>
 
               <button class="primary-btn" type="submit" :disabled="authState.loading">
@@ -106,7 +153,7 @@
 
 <script setup>
 import { computed, onMounted, reactive, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useI18n } from 'vue-i18n'
 import {
   authState,
@@ -115,7 +162,8 @@ import {
   login,
   logout,
   register,
-  saveLlmConfig
+  saveLlmConfig,
+  selectPlatformModel
 } from '../store/auth'
 
 const open = ref(false)
@@ -123,6 +171,7 @@ const mode = ref('login')
 const localError = ref('')
 const { t } = useI18n()
 const router = useRouter()
+const route = useRoute()
 
 const accountForm = reactive({
   username: '',
@@ -136,9 +185,12 @@ const llmForm = reactive({
   api_key: ''
 })
 
+const activePlatformId = computed(() => authState.user?.platform_model?.id ?? null)
+
 const triggerLabel = computed(() => {
   if (!authState.user) return t('auth.login')
   if (!authState.user.llm_configured) return t('auth.setApiKey')
+  if (authState.user.platform_model) return authState.user.platform_model.label
   return authState.user.llm?.model || t('auth.llmReady')
 })
 
@@ -203,9 +255,30 @@ const submitAccount = async () => {
     }
     accountForm.password = ''
     hydrateLlmForm()
+    // After signing in / registering, show the plans page so the user can see
+    // what each plan unlocks (the engine needs Lite or above). Admin pages keep
+    // their own flow; the plans page itself stays put.
+    if (route.path !== '/subscription' && !route.path.startsWith('/admin')) {
+      open.value = false
+      router.push('/subscription')
+    }
   } catch (error) {
     localError.value = error.message || t('auth.accountRequestFailed')
   }
+}
+
+const usePlatformModel = async (id) => {
+  localError.value = ''
+  try {
+    await selectPlatformModel(id)
+  } catch (error) {
+    localError.value = error.message || t('auth.switchModelFailed')
+  }
+}
+
+const goSubscription = () => {
+  open.value = false
+  router.push('/subscription')
 }
 
 const submitLlmConfig = async () => {
@@ -412,6 +485,67 @@ select {
   font-size: 10px;
   font-weight: 700;
   text-transform: uppercase;
+}
+
+.platform-box {
+  display: grid;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding: 10px;
+  border: 1px solid #111;
+  background: #fafaf7;
+}
+
+.platform-hint {
+  margin: 0;
+  color: #555;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.platform-upsell {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.platform-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #ddd;
+  background: #fff;
+  text-transform: none;
+  cursor: pointer;
+}
+
+.platform-option.active {
+  border-color: #1a936f;
+  background: #f1faf6;
+}
+
+.platform-option input {
+  width: auto;
+  min-height: 0;
+  flex: none;
+}
+
+.platform-option-text {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+}
+
+.platform-option-text small {
+  color: #666;
+  font-size: 11px;
+  font-weight: 400;
+  overflow-wrap: anywhere;
+}
+
+.own-api-title {
+  margin-bottom: 8px;
 }
 
 .llm-status {

@@ -3,8 +3,10 @@ import {
   getCurrentUser,
   getLlmProviders,
   loginAccount,
+  getPlatformModels,
   logoutAccount,
   registerAccount,
+  selectPlatformModelApi,
   updateLlmConfig
 } from '../api/auth'
 import DEFAULT_PROVIDERS from '../config/providers'
@@ -33,6 +35,8 @@ export const authState = reactive({
   token: localStorage.getItem(TOKEN_KEY) || '',
   user: loadCachedUser(),
   providers: { ...DEFAULT_PROVIDERS },
+  // Site-provided models (Premium/Pro/admin only); filled by loadPlatformModels()
+  platformModels: [],
   loading: false,
   error: ''
 })
@@ -50,6 +54,21 @@ const setSession = (token, user) => {
   }
 
   saveUserCache(authState.user)
+  if (!authState.token) authState.platformModels = []
+}
+
+export const loadPlatformModels = async () => {
+  if (!authState.token || !authState.user?.can_use_platform_models) {
+    authState.platformModels = []
+    return authState.platformModels
+  }
+  try {
+    const res = await getPlatformModels()
+    authState.platformModels = res.data?.models || []
+  } catch {
+    authState.platformModels = []
+  }
+  return authState.platformModels
 }
 
 export const loadProviders = async () => {
@@ -66,6 +85,7 @@ export const loadCurrentUser = async () => {
     const res = await getCurrentUser()
     authState.user = res.data?.user || null
     saveUserCache(authState.user)
+    await loadPlatformModels()
     return authState.user
   } catch (error) {
     // Network error: backend is not reachable — keep cached session intact.
@@ -89,6 +109,7 @@ export const login = async ({ username, password }) => {
   try {
     const res = await loginAccount({ username, password })
     setSession(res.data?.token, res.data?.user)
+    await loadPlatformModels()
     return authState.user
   } catch (error) {
     authState.error = error.message || 'Login failed.'
@@ -104,6 +125,7 @@ export const register = async ({ username, password }) => {
   try {
     const res = await registerAccount({ username, password })
     setSession(res.data?.token, res.data?.user)
+    await loadPlatformModels()
     return authState.user
   } catch (error) {
     authState.error = error.message || 'Registration failed.'
@@ -123,6 +145,23 @@ export const saveLlmConfig = async (payload) => {
     return authState.user
   } catch (error) {
     authState.error = error.message || 'Failed to save LLM settings.'
+    throw error
+  } finally {
+    authState.loading = false
+  }
+}
+
+// Pick a site-provided model (id) or null to go back to the user's own API key.
+export const selectPlatformModel = async (platformModelId) => {
+  authState.loading = true
+  authState.error   = ''
+  try {
+    const res = await selectPlatformModelApi(platformModelId)
+    authState.user = res.data?.user || authState.user
+    saveUserCache(authState.user)
+    return authState.user
+  } catch (error) {
+    authState.error = error.message || 'Failed to switch model.'
     throw error
   } finally {
     authState.loading = false

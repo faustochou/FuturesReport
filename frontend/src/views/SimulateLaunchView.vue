@@ -88,13 +88,13 @@
                 :disabled="loading"
               ></textarea>
               <select
-                v-if="isConfigured && availableModels.length > 0"
+                v-if="isConfigured && modelOptions.length > 0"
                 :value="currentModel"
                 class="model-select"
                 :disabled="changingModel"
                 @change="onModelChange"
               >
-                <option v-for="m in availableModels" :key="m" :value="m">{{ m }}</option>
+                <option v-for="m in modelOptions" :key="m.value" :value="m.value">{{ m.label }}</option>
               </select>
               <select v-else class="model-select model-select--disabled" disabled>
                 <option>Nexora AI</option>
@@ -126,7 +126,7 @@
 <script setup>
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
-import { authState, saveLlmConfig } from '../store/auth'
+import { authState, saveLlmConfig, selectPlatformModel } from '../store/auth'
 import HistoryDatabase from '../components/HistoryDatabase.vue'
 
 const router = useRouter()
@@ -149,23 +149,43 @@ const canSubmit = computed(() =>
 
 const changingModel = ref(false)
 const isConfigured = computed(() => Boolean(authState.user?.llm_configured))
-const availableModels = computed(() => {
+// When a site-provided model is in use (Premium), the dropdown lists those models;
+// otherwise it lists the models of the user's own provider.
+const usingPlatformModel = computed(() => !!authState.user?.platform_model)
+const modelOptions = computed(() => {
+  if (usingPlatformModel.value) {
+    const list = authState.platformModels.map(m => ({ value: String(m.id), label: m.label }))
+    const active = authState.user.platform_model
+    if (!list.some(o => o.value === String(active.id))) {
+      list.unshift({ value: String(active.id), label: active.label })
+    }
+    return list
+  }
   const provider = authState.user?.llm?.provider
   const current = authState.user?.llm?.model
   if (!provider) return []
   const list = authState.providers[provider]?.models || []
-  if (list.length === 0 && current) return [current]
-  return list
+  if (list.length === 0 && current) return [{ value: current, label: current }]
+  return list.map(m => ({ value: m, label: m }))
 })
-const currentModel = computed(() => authState.user?.llm?.model || '')
+const currentModel = computed(() =>
+  usingPlatformModel.value
+    ? String(authState.user.platform_model.id)
+    : (authState.user?.llm?.model || '')
+)
 
 const onModelChange = async (event) => {
   const newModel = event.target.value
-  const provider = authState.user?.llm?.provider
-  if (!newModel || !provider) return
+  if (!newModel) return
   changingModel.value = true
   try {
-    await saveLlmConfig({ provider, model: newModel })
+    if (usingPlatformModel.value) {
+      await selectPlatformModel(Number(newModel))
+    } else {
+      const provider = authState.user?.llm?.provider
+      if (!provider) return
+      await saveLlmConfig({ provider, model: newModel })
+    }
   } catch {
     // keep existing config on error
   } finally {
