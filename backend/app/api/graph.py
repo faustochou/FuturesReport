@@ -502,8 +502,7 @@ def build_graph():
                 # 避免用户的 LLM API Key 明文进入 log 或存到 project.json/task 记录）
                 safe_error = redact_secrets(str(e))
                 safe_traceback = redact_secrets(traceback.format_exc())
-                build_logger.error(f"[{task_id}] 图谱构建失败: {safe_error}")
-                build_logger.debug(safe_traceback)
+                build_logger.error(f"[{task_id}] 图谱构建失败: {safe_error}\n{safe_traceback}")
 
                 project.status = ProjectStatus.FAILED
                 project.error = safe_error
@@ -513,7 +512,9 @@ def build_graph():
                     task_id,
                     status=TaskStatus.FAILED,
                     message=t('progress.buildFailed', error=safe_error),
-                    error=safe_traceback
+                    # 前端会把 error 原样显示给用户：只放可读的错误讯息，
+                    # 完整 traceback 只写进服务端 log（上面的 build_logger.error）。
+                    error=safe_error
                 )
         
         # 启动后台线程
