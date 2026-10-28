@@ -195,7 +195,12 @@ const triggerLabel = computed(() => {
 })
 
 const currentProvider = computed(() => authState.providers[llmForm.provider] || {})
-const currentModels = computed(() => currentProvider.value.models || [])
+// A model saved earlier may have been retired from the catalogue; keep it selectable
+// so the dropdown doesn't silently show a blank value.
+const currentModels = computed(() => {
+  const list = currentProvider.value.models || []
+  return llmForm.model && !list.includes(llmForm.model) ? [llmForm.model, ...list] : list
+})
 const keyPlaceholder = computed(() => authState.user?.llm?.api_key_hint || t('auth.apiKeyPlaceholder'))
 const errorMap = {
   'Invalid username or password.': 'auth.invalidCredentials',

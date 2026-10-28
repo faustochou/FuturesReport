@@ -31,7 +31,7 @@ class Config:
     LLM_PROVIDER = os.environ.get('LLM_PROVIDER', 'openai')
     LLM_API_KEY = os.environ.get('LLM_API_KEY')
     LLM_BASE_URL = os.environ.get('LLM_BASE_URL', 'https://api.openai.com/v1')
-    LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-4o-mini')
+    LLM_MODEL_NAME = os.environ.get('LLM_MODEL_NAME', 'gpt-6-luna')
 
     # Report Agent 专用 LLM 配置（可选）
     # 未设置时回退到上方通用 LLM_* 配置，用于将报告生成与模拟的 LLM 配额分开，减轻限流压力

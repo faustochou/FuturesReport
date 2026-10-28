@@ -30,6 +30,17 @@ _JSON_MODE_PROVIDERS = frozenset({
     "openai", "qwen", "deepseek", "kimi", "glm", "minimax", "mistral", "gemini",
 })
 
+# Newer model generations reject parameters the older chat models accepted:
+#  - OpenAI GPT-5.x / GPT-6 / o-series: no `temperature` (reasoning models), and
+#    the output cap is `max_completion_tokens`. Reasoning tokens count against it,
+#    so keep effort low or a 4096 cap can be spent before any text is produced.
+#  - Claude Fable / Mythos / Opus 4.7+ / Sonnet 5+ / Haiku 5+: sampling params
+#    (temperature) return 400. The 5.x generation also thinks by default, so ask
+#    for low effort to keep thinking from eating the max_tokens budget.
+_OPENAI_REASONING_MODEL = re.compile(r'^(gpt-[56]|o\d)')
+_ANTHROPIC_NO_SAMPLING = re.compile(r'^claude-(fable|mythos|opus-4-[78]|opus-5|sonnet-5|haiku-5)')
+_ANTHROPIC_THINKS_BY_DEFAULT = re.compile(r'^claude-(fable|mythos|opus-5|sonnet-5|haiku-5)')
+
 
 class LLMClient:
     """LLM客户端"""
@@ -89,6 +100,10 @@ class LLMClient:
             "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        if self.provider == "openai" and _OPENAI_REASONING_MODEL.match(self.model or ""):
+            kwargs.pop("temperature")
+            kwargs["max_completion_tokens"] = kwargs.pop("max_tokens")
+            kwargs["reasoning_effort"] = "low"
         
         if response_format:
             kwargs["response_format"] = response_format
@@ -124,7 +139,7 @@ class LLMClient:
                 )
                 time.sleep(delay)
 
-        content = response.choices[0].message.content
+        content = response.choices[0].message.content or ""
         # 部分模型（如MiniMax M2.5）会在content中包含<think>思考内容，需要移除
         content = re.sub(r'<think>[\s\S]*?</think>', '', content).strip()
         return content
@@ -178,9 +193,13 @@ class LLMClient:
         payload = {
             "model": self.model,
             "messages": anthropic_messages,
-            "temperature": temperature,
             "max_tokens": max_tokens,
         }
+        model_id = self.model or ""
+        if not _ANTHROPIC_NO_SAMPLING.match(model_id):
+            payload["temperature"] = temperature
+        if _ANTHROPIC_THINKS_BY_DEFAULT.match(model_id):
+            payload["output_config"] = {"effort": "low"}
         if system_parts:
             payload["system"] = "\n\n".join(system_parts)
 

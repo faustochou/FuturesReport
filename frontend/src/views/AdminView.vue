@@ -745,7 +745,7 @@ const pmLoading       = ref(false)
 const pmMessage       = ref('')
 const pmError         = ref('')
 const pmForm          = reactive({
-  provider: 'openai', model: 'gpt-4o-mini', label: '',
+  provider: 'openai', model: 'gpt-6-luna', label: '',
   base_url: 'https://api.openai.com/v1', api_key: '', is_enabled: true,
 })
 const pmProviderModels = computed(() => providers.value[pmForm.provider]?.models || [])
