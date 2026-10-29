@@ -38,11 +38,11 @@ from .graphiti_ontology import convert_ontology
 
 logger = get_logger('futuresreport.graph_builder')
 
-# 每次 add_episode_bulk() 一起送進 Graphiti 的 chunk 數。Graphiti 會在一批之內
-# 並行抽取（受 LLM_CONCURRENCY_LIMIT / max_coroutines 限制），並在批內與既有
-# 圖譜之間做實體與關係去重；逐塊 add_episode() 則完全序列化。批次太大會讓單次
-# 呼叫很久才回報一次進度、失敗時重做的範圍也大，10 是兩者的折衷。
-GRAPH_BULK_BATCH_SIZE = max(1, int(os.environ.get("GRAPH_BULK_BATCH_SIZE", "10")))
+# 每次 add_episode_bulk() 一起送進 Graphiti 的 chunk 數。一批之內所有 LLM 呼叫
+# 並行（受 GRAPHITI_MAX_COROUTINES 限制），批與批之間依序執行；總時間大致是
+# 「批數 × 每批約 6–7 輪 LLM 往返」，所以批次越大越快。批內的實體去重由
+# graphiti_batch.BatchDedupGraphiti 補上 LLM 比對，品質與小批次相同。
+GRAPH_BULK_BATCH_SIZE = max(1, int(os.environ.get("GRAPH_BULK_BATCH_SIZE", "100")))
 # 單一批次的最長處理時間（秒）。LLM 請求本身已有逾時（graphiti_factory），這是
 # 最後一道保險：任何未預期的卡住都會在這個時間後變成明確的失敗，而不是讓建圖
 # 任務永遠停在某個百分比。

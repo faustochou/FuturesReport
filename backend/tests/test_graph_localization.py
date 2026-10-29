@@ -92,7 +92,7 @@ def test_build_graphiti_wires_the_directive_for_the_current_locale(provider, mod
     built = {}
     monkeypatch.setattr(gf, "FalkorDB", lambda **kw: object())
     monkeypatch.setattr(gf, "FalkorDriver", lambda **kw: object())
-    monkeypatch.setattr(gf, "Graphiti", lambda **kw: built.update(kw) or type("G", (), kw)())
+    monkeypatch.setattr(gf, "BatchDedupGraphiti", lambda **kw: built.update(kw) or type("G", (), kw)())
     build_graphiti = gf.build_graphiti
 
     set_locale("zh-TW")

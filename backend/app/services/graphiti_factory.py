@@ -36,6 +36,7 @@ from falkordb.asyncio import FalkorDB
 from google import genai
 from google.genai import types as genai_types
 from graphiti_core import Graphiti
+from graphiti_core import helpers as graphiti_helpers
 from openai import AsyncOpenAI
 from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.driver.falkordb_driver import FalkorDriver
@@ -50,6 +51,12 @@ from graphiti_core.prompts.models import Message
 
 from ..utils.locale import get_locale, t
 from .graph_localization import apply_language_directive, graph_language_directive
+from .graphiti_batch import (
+    AdaptiveConcurrencyLimiter,
+    BatchDedupGraphiti,
+    ThrottledFalkorDriver,
+    apply_rate_limit_handling,
+)
 from ..utils.logger import get_logger
 
 logger = get_logger('futuresreport.graphiti_factory')
@@ -124,7 +131,10 @@ SERVER_SIDE_DIM_PROVIDERS = frozenset({"openai"})
 
 DEFAULT_FALKORDB_HOST = "localhost"
 DEFAULT_FALKORDB_PORT = 6379
-DEFAULT_LLM_CONCURRENCY_LIMIT = 6
+# Graphiti 同時進行的 LLM / 資料庫協程上限。批次建圖時一批內的各塊是並行處理
+# 的，這個值決定實際並行度（舊值 6 讓一份長文件要跑半小時以上）。遇到供應商
+# 速率限制時，AdaptiveConcurrencyLimiter 會自動往下調，不會讓建圖失敗。
+DEFAULT_LLM_CONCURRENCY_LIMIT = 100
 
 # FalkorDriver 自己組裝的 FalkorDB client 沒有設 socket_timeout /
 # socket_connect_timeout（底層 redis-py 預設值是 None，代表不設限）。Stage 5
@@ -165,7 +175,7 @@ GEMINI_LLM_MAX_TOKENS = 65536
 # 下面的 HTTP 層重試處理。OpenAI SDK 預設是 600 秒，這裡一併縮短成同一個值。
 LLM_REQUEST_TIMEOUT_SECONDS = int(os.environ.get("GRAPHITI_LLM_TIMEOUT_SECONDS", "180"))
 # HTTP 層對暫時性錯誤（429 / 5xx）的自動重試次數（含第一次）。
-LLM_HTTP_RETRY_ATTEMPTS = 4
+LLM_HTTP_RETRY_ATTEMPTS = 6
 
 
 class UnsupportedProviderError(ValueError):
@@ -323,10 +333,10 @@ class NoOpRerankerClient(CrossEncoderClient):
 
 
 def get_llm_concurrency_limit() -> int:
-    """讀取 LLM 並發限制環境變數（沿用既有 LLM_CONCURRENCY_LIMIT 慣例），用來覆蓋
-    Graphiti 的 SEMAPHORE_LIMIT（見 Graphiti(max_coroutines=...)），不需要自建
-    asyncio.Semaphore。"""
-    raw = os.environ.get("LLM_CONCURRENCY_LIMIT", str(DEFAULT_LLM_CONCURRENCY_LIMIT))
+    """Graphiti 的並行上限（覆蓋 graphiti-core 的 SEMAPHORE_LIMIT，見
+    Graphiti(max_coroutines=...)）。用獨立的 GRAPHITI_MAX_COROUTINES，不再沿用
+    LLM_CONCURRENCY_LIMIT——那個變數是給模擬引擎用的（預設 8），兩者的合理值差很多。"""
+    raw = os.environ.get("GRAPHITI_MAX_COROUTINES", str(DEFAULT_LLM_CONCURRENCY_LIMIT))
     try:
         value = int(raw)
     except (TypeError, ValueError):
@@ -351,6 +361,8 @@ def _build_llm_and_embedder(
                 timeout=LLM_REQUEST_TIMEOUT_SECONDS * 1000,  # 毫秒
                 retry_options=genai_types.HttpRetryOptions(
                     attempts=LLM_HTTP_RETRY_ATTEMPTS,
+                    initial_delay=2.0,
+                    max_delay=60.0,
                     http_status_codes=[408, 429, 500, 502, 503, 504],
                 ),
             ),
@@ -469,19 +481,29 @@ def build_graphiti(user_llm_config: Dict[str, str], graph_id: Optional[str] = No
         socket_connect_timeout=FALKORDB_SOCKET_CONNECT_TIMEOUT,
         socket_timeout=FALKORDB_SOCKET_TIMEOUT,
     )
-    driver = FalkorDriver(
+    # 查詢並行另外限流：FalkorDB 預設最多排隊 25 個查詢，超過直接拒絕（見 graphiti_batch）。
+    driver = ThrottledFalkorDriver(
         falkor_db=falkor_client,
         database=graph_id or "default_db",
     )
 
     logger.info(f"組裝 Graphiti 實例: graph_id={graph_id or '(unscoped)'}, provider={provider}, model={model}")
 
-    return Graphiti(
+    max_coroutines = get_llm_concurrency_limit()
+    # graphiti-core 的批次流程有不少 semaphore_gather() 沒傳 max_coroutines，會退回
+    # 全域 SEMAPHORE_LIMIT（預設 20）——實測一批 100 塊時同時最多只有 20 個 LLM 呼叫。
+    # 把全域值拉到同一個上限；實際送出的 LLM 請求仍由下面的 limiter 控制，
+    # 資料庫查詢由 ThrottledFalkorDriver 控制。
+    graphiti_helpers.SEMAPHORE_LIMIT = max(graphiti_helpers.SEMAPHORE_LIMIT, max_coroutines)
+    # 速率限制時自動降並行、退避重試，而不是讓整次建圖失敗（見 graphiti_batch）。
+    apply_rate_limit_handling(llm_client, AdaptiveConcurrencyLimiter(max_coroutines))
+
+    return BatchDedupGraphiti(
         graph_driver=driver,
         llm_client=llm_client,
         embedder=embedder,
         cross_encoder=NoOpRerankerClient(),
-        max_coroutines=get_llm_concurrency_limit(),
+        max_coroutines=max_coroutines,
     )
 
 
