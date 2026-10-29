@@ -50,6 +50,12 @@ class Project:
     # 见 app/services/graphiti_factory.py 的 check_embedding_consistency()。
     embedding_provider: Optional[str] = None
     embedding_model: Optional[str] = None
+
+    # 实体/关系类型的显示名称（类型本身一律是英文识别字）：
+    # {"entity": {"ClimateScientist": "氣候科學家"}, "edge": {"WORKS_FOR": "任職於"}}。
+    # 建图完成后补上本体没有提供、或 Graphiti 自行新增的关系类型的翻译，
+    # 见 services/graph_localization.py。
+    type_display_names: Optional[Dict[str, Dict[str, str]]] = None
     
     # 配置
     simulation_requirement: Optional[str] = None
@@ -75,6 +81,7 @@ class Project:
             "graph_build_task_id": self.graph_build_task_id,
             "embedding_provider": self.embedding_provider,
             "embedding_model": self.embedding_model,
+            "type_display_names": self.type_display_names,
             "simulation_requirement": self.simulation_requirement,
             "chunk_size": self.chunk_size,
             "chunk_overlap": self.chunk_overlap,
@@ -102,6 +109,7 @@ class Project:
             graph_build_task_id=data.get('graph_build_task_id'),
             embedding_provider=data.get('embedding_provider'),
             embedding_model=data.get('embedding_model'),
+            type_display_names=data.get('type_display_names'),
             simulation_requirement=data.get('simulation_requirement'),
             chunk_size=data.get('chunk_size', 2000),
             chunk_overlap=data.get('chunk_overlap', 200),
@@ -246,6 +254,18 @@ class ProjectManager:
         
         return projects[:limit]
     
+    @classmethod
+    def find_by_graph_id(cls, graph_id: str) -> Optional[Project]:
+        """找出使用这个 graph_id 的项目（项目数量小，直接扫描即可）。"""
+        if not graph_id:
+            return None
+        cls._ensure_projects_dir()
+        for project_id in os.listdir(cls.PROJECTS_DIR):
+            project = cls.get_project(project_id)
+            if project and project.graph_id == graph_id:
+                return project
+        return None
+
     @classmethod
     def delete_project(cls, project_id: str) -> bool:
         """

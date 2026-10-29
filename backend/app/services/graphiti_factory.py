@@ -48,7 +48,8 @@ from graphiti_core.llm_client.gemini_client import GeminiClient
 from graphiti_core.llm_client.openai_generic_client import OpenAIGenericClient
 from graphiti_core.prompts.models import Message
 
-from ..utils.locale import t
+from ..utils.locale import get_locale, t
+from .graph_localization import apply_language_directive, graph_language_directive
 from ..utils.logger import get_logger
 
 logger = get_logger('futuresreport.graphiti_factory')
@@ -457,6 +458,9 @@ def build_graphiti(user_llm_config: Dict[str, str], graph_id: Optional[str] = No
     base_url = user_llm_config.get("base_url") or ""
 
     llm_client, embedder = _build_llm_and_embedder(provider, api_key, model, base_url)
+    # 圖譜內容（實體名稱、摘要、關係事實）跟著介面語言走：建圖 / 模擬記憶更新的
+    # 背景執行緒都已經 set_locale()，這裡取到的就是發起請求的使用者語言。
+    apply_language_directive(llm_client, graph_language_directive(get_locale()))
 
     falkor_client = FalkorDB(
         host=os.environ.get("FALKORDB_HOST", DEFAULT_FALKORDB_HOST),

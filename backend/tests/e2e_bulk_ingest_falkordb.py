@@ -12,6 +12,8 @@ Checks:
   2. Repeated get_graph_data() calls (what the page polls every 10 s) do not
      leave FalkorDB connections open.
   3. delete_graph_by_id() empties the graph.
+  4. With the UI locale set to zh-TW, every LLM request Graphiti makes during
+     the bulk build carries the Traditional-Chinese language directive.
 """
 
 import asyncio
@@ -32,13 +34,16 @@ from graphiti_core.llm_client.client import LLMClient  # noqa: E402
 from graphiti_core.llm_client.config import LLMConfig  # noqa: E402
 
 from app.services import graph_builder as gb  # noqa: E402
+from app.services.graph_localization import apply_language_directive, graph_language_directive  # noqa: E402
 from app.services.graphiti_factory import GRAPHITI_EMBEDDING_DIM, NoOpRerankerClient  # noqa: E402
+from app.utils.locale import get_locale, set_locale  # noqa: E402
 
 HOST = os.environ.get("FALKORDB_HOST", "localhost")
 PORT = int(os.environ.get("FALKORDB_PORT", "6379"))
 PASSWORD = os.environ.get("FALKORDB_PASSWORD") or None
 GRAPH_ID = f"fr_e2e_{uuid.uuid4().hex[:12]}"
 ENTITIES = ["Alpha Institute", "Beta Agency"]
+SYSTEM_PROMPTS = []  # (response model name, system message) for every LLM request
 
 
 def _minimal(schema, defs):
@@ -68,6 +73,7 @@ class FakeLLM(LLMClient):
 
     async def _generate_response(self, messages, response_model=None, max_tokens=0, model_size=None):
         name = response_model.__name__ if response_model else ""
+        SYSTEM_PROMPTS.append((name, next((m.content for m in messages if m.role == "system"), "")))
         if name == "ExtractedEntities":
             return {"extracted_entities": [{"name": n, "entity_type_id": 0} for n in ENTITIES]}
         if name == "ExtractedEdges":
@@ -104,7 +110,9 @@ def fake_build_graphiti(user_llm_config, graph_id=None):
                            socket_connect_timeout=10, socket_timeout=30),
         database=graph_id or "default_db",
     )
-    return Graphiti(graph_driver=driver, llm_client=FakeLLM(), embedder=FakeEmbedder(),
+    # same wiring as graphiti_factory.build_graphiti()
+    llm = apply_language_directive(FakeLLM(), graph_language_directive(get_locale()))
+    return Graphiti(graph_driver=driver, llm_client=llm, embedder=FakeEmbedder(),
                     cross_encoder=NoOpRerankerClient(), max_coroutines=6)
 
 
@@ -113,6 +121,7 @@ def connected_clients(db):
 
 
 def main():
+    set_locale("zh-TW")  # what the build thread does for a 繁體中文 UI
     gb.build_graphiti = fake_build_graphiti
     gb.enforce_embedding_consistency = lambda cfg, gid: None
     service = gb.GraphBuilderService({"provider": "gemini", "model": "fake", "api_key": "fake", "base_url": ""})
@@ -136,6 +145,11 @@ def main():
     assert progress[-1] == 1.0 and len(progress) == math.ceil(len(chunks) / gb.GRAPH_BULK_BATCH_SIZE)
     assert sorted(r[0] for r in entities) == sorted(ENTITIES), "entities must be deduplicated across batches"
     assert edges >= 1 and mentions >= len(chunks)
+
+    kinds = sorted({name for name, _ in SYSTEM_PROMPTS})
+    without = [name for name, text in SYSTEM_PROMPTS if "Traditional Chinese" not in text]
+    print(f"LLM requests={len(SYSTEM_PROMPTS)} kinds={kinds} without zh-TW directive={len(without)}")
+    assert SYSTEM_PROMPTS and not without, f"requests missing the language directive: {without[:5]}"
 
     before = connected_clients(sync_db)
     for _ in range(20):

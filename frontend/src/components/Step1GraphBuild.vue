@@ -47,8 +47,9 @@
           <div v-if="selectedOntologyItem" class="ontology-detail-overlay">
             <div class="detail-header">
                <div class="detail-title-group">
-                  <span class="detail-type-badge">{{ selectedOntologyItem.itemType === 'entity' ? 'ENTITY' : 'RELATION' }}</span>
-                  <span class="detail-name">{{ selectedOntologyItem.name }}</span>
+                  <span class="detail-type-badge">{{ selectedOntologyItem.itemType === 'entity' ? $t('step1.entityBadge') : $t('step1.relationBadge') }}</span>
+                  <span class="detail-name">{{ typeDisplay(selectedOntologyItem.itemType === 'entity' ? 'entity' : 'edge', selectedOntologyItem) }}</span>
+                  <span v-if="typeDisplay(selectedOntologyItem.itemType === 'entity' ? 'entity' : 'edge', selectedOntologyItem) !== selectedOntologyItem.name" class="detail-identifier">{{ selectedOntologyItem.name }}</span>
                </div>
                <button class="close-btn" @click="selectedOntologyItem = null">×</button>
             </div>
@@ -57,7 +58,7 @@
                
                <!-- Attributes -->
                <div class="detail-section" v-if="selectedOntologyItem.attributes?.length">
-                  <span class="section-label">ATTRIBUTES</span>
+                  <span class="section-label">{{ $t('step1.attributes') }}</span>
                   <div class="attr-list">
                      <div v-for="attr in selectedOntologyItem.attributes" :key="attr.name" class="attr-item">
                         <span class="attr-name">{{ attr.name }}</span>
@@ -69,7 +70,7 @@
 
                <!-- Examples (Entity) -->
                <div class="detail-section" v-if="selectedOntologyItem.examples?.length">
-                  <span class="section-label">EXAMPLES</span>
+                  <span class="section-label">{{ $t('step1.examples') }}</span>
                   <div class="example-list">
                      <span v-for="ex in selectedOntologyItem.examples" :key="ex" class="example-tag">{{ ex }}</span>
                   </div>
@@ -77,12 +78,12 @@
 
                <!-- Source/Target (Relation) -->
                <div class="detail-section" v-if="selectedOntologyItem.source_targets?.length">
-                  <span class="section-label">CONNECTIONS</span>
+                  <span class="section-label">{{ $t('step1.connections') }}</span>
                   <div class="conn-list">
                      <div v-for="(conn, idx) in selectedOntologyItem.source_targets" :key="idx" class="conn-item">
-                        <span class="conn-node">{{ conn.source }}</span>
+                        <span class="conn-node">{{ entityNameDisplay(conn.source) }}</span>
                         <span class="conn-arrow">→</span>
-                        <span class="conn-node">{{ conn.target }}</span>
+                        <span class="conn-node">{{ entityNameDisplay(conn.target) }}</span>
                      </div>
                   </div>
                </div>
@@ -91,7 +92,7 @@
 
           <!-- Generated Entity Tags -->
           <div v-if="projectData?.ontology?.entity_types" class="tags-container" :class="{ 'dimmed': selectedOntologyItem }">
-            <span class="tag-label">GENERATED ENTITY TYPES</span>
+            <span class="tag-label">{{ $t('step1.generatedEntityTypes') }}</span>
             <div class="tags-list">
               <span 
                 v-for="entity in projectData.ontology.entity_types" 
@@ -99,14 +100,14 @@
                 class="entity-tag clickable"
                 @click="selectOntologyItem(entity, 'entity')"
               >
-                {{ entity.name }}
+                {{ typeDisplay('entity', entity) }}
               </span>
             </div>
           </div>
 
           <!-- Generated Relation Tags -->
           <div v-if="projectData?.ontology?.edge_types" class="tags-container" :class="{ 'dimmed': selectedOntologyItem }">
-            <span class="tag-label">GENERATED RELATION TYPES</span>
+            <span class="tag-label">{{ $t('step1.generatedRelationTypes') }}</span>
             <div class="tags-list">
               <span 
                 v-for="rel in projectData.ontology.edge_types" 
@@ -114,7 +115,7 @@
                 class="entity-tag clickable"
                 @click="selectOntologyItem(rel, 'relation')"
               >
-                {{ rel.name }}
+                {{ typeDisplay('edge', rel) }}
               </span>
             </div>
           </div>
@@ -261,6 +262,14 @@ const handleEnterEnvSetup = async () => {
   } finally {
     creatingSimulation.value = false
   }
+}
+
+// 类型名称在后端是英文识别字；显示时优先用本体的 display_name，其次是建图后补的翻译。
+const typeDisplay = (kind, item) =>
+  item?.display_name || props.projectData?.type_display_names?.[kind]?.[item?.name] || item?.name
+const entityNameDisplay = (name) => {
+  const entity = props.projectData?.ontology?.entity_types?.find(e => e.name === name)
+  return entity ? typeDisplay('entity', entity) : (props.projectData?.type_display_names?.entity?.[name] || name)
 }
 
 const selectOntologyItem = (item, type) => {
@@ -519,6 +528,13 @@ watch(() => props.systemLogs.length, () => {
     padding: 2px 6px;
     border-radius: 2px;
     text-transform: uppercase;
+}
+
+.detail-identifier {
+  margin-left: 8px;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  color: #999;
 }
 
 .detail-name {

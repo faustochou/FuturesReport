@@ -122,7 +122,14 @@
     "creating": "Creating...",
     "enterEnvSetup": "Enter Environment Setup",
     "createSimulationFailed": "Failed to create simulation: {error}",
-    "createSimulationException": "Simulation creation error: {error}"
+    "createSimulationException": "Simulation creation error: {error}",
+    "entityBadge": "ENTITY",
+    "relationBadge": "RELATION",
+    "attributes": "ATTRIBUTES",
+    "examples": "EXAMPLES",
+    "connections": "CONNECTIONS",
+    "generatedEntityTypes": "GENERATED ENTITY TYPES",
+    "generatedRelationTypes": "GENERATED RELATION TYPES"
   },
   "step2": {
     "simInstanceInit": "Simulation Instance Initialization",
@@ -335,7 +342,24 @@
     "graphDataLoading": "Loading graph data...",
     "waitingOntology": "Waiting for ontology generation...",
     "toggleMaximize": "Maximize/Restore",
-    "closeHint": "Close hint"
+    "closeHint": "Close hint",
+    "entityTypes": "Entity Types",
+    "unknown": "Unknown",
+    "name": "Name",
+    "uuid": "UUID",
+    "created": "Created",
+    "fact": "Fact",
+    "type": "Type",
+    "label": "Label",
+    "validFrom": "Valid From",
+    "properties": "Properties",
+    "summary": "Summary",
+    "labels": "Labels",
+    "episodes": "Episodes",
+    "selfRelations": "Self Relations",
+    "itemCount": "{count} items",
+    "showEdgeLabels": "Show Edge Labels",
+    "none": "None"
   },
   "graphiti": {
     "noEmbeddingSupport": "Graph construction requires embedding support. Please switch to Gemini, OpenAI, or another provider that offers an embedding endpoint. (Current selection: {provider})",

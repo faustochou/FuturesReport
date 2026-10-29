@@ -13,6 +13,7 @@ from ..config import Config
 from ..services.ontology_generator import OntologyGenerator
 from ..services.graph_builder import GraphBuilderService, delete_graph_by_id
 from ..services.graphiti_factory import redact_secrets
+from ..services.graph_localization import build_type_labels, missing_type_names, translate_type_names
 from ..services.text_processor import TextProcessor
 from ..utils.file_parser import FileParser
 from ..utils.logger import get_logger
@@ -517,6 +518,21 @@ def build_graph():
                 )
                 graph_data = builder.get_graph_data(graph_id)
 
+                # 类型显示名称：本体没给 display_name 的类型、以及 Graphiti 自行新增的
+                # 关系类型，在这里用介面语言翻译一次存进项目（失败不影响建图结果）。
+                missing = missing_type_names(
+                    ontology,
+                    project.type_display_names,
+                    (label for n in graph_data.get("nodes", []) for label in (n.get("labels") or [])),
+                    (e.get("name") for e in graph_data.get("edges", [])),
+                    current_locale,
+                )
+                translated = translate_type_names(LLMClient(**llm_config), missing, current_locale)
+                stored = project.type_display_names or {"entity": {}, "edge": {}}
+                for kind in ("entity", "edge"):
+                    stored.setdefault(kind, {}).update(translated.get(kind) or {})
+                project.type_display_names = stored
+
                 # 更新项目状态
                 project.status = ProjectStatus.GRAPH_COMPLETED
                 ProjectManager.save_project(project)
@@ -628,6 +644,14 @@ def get_graph_data(graph_id: str):
         llm_config = get_current_llm_config()
         builder = GraphBuilderService(user_llm_config=llm_config)
         graph_data = builder.get_graph_data(graph_id)
+
+        # 前端用来把英文类型识别字显示成介面语言（图例、关系标签、详情面板）
+        project = ProjectManager.find_by_graph_id(graph_id)
+        graph_data["type_labels"] = build_type_labels(
+            project.ontology if project else None,
+            project.type_display_names if project else None,
+            get_locale(),
+        )
 
         return jsonify({
             "success": True,

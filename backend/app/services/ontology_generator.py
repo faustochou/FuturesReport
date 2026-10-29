@@ -8,7 +8,8 @@ import logging
 import re
 from typing import Dict, Any, List, Optional
 from ..utils.llm_client import LLMClient
-from ..utils.locale import get_language_instruction
+from ..utils.locale import get_language_instruction, get_locale
+from .graph_localization import build_type_labels
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +64,7 @@ ONTOLOGY_SYSTEM_PROMPT = """你是一个专业的知识图谱本体设计专家�
     "entity_types": [
         {
             "name": "实体类型名称（英文，PascalCase）",
+            "display_name": "实体类型的显示名称（使用指定的输出语言，简短，如「气候科学家」）",
             "description": "简短描述（英文，不超过100字符）",
             "attributes": [
                 {
@@ -77,6 +79,7 @@ ONTOLOGY_SYSTEM_PROMPT = """你是一个专业的知识图谱本体设计专家�
     "edge_types": [
         {
             "name": "关系类型名称（英文，UPPER_SNAKE_CASE）",
+            "display_name": "关系类型的显示名称（使用指定的输出语言，简短，如「任职于」）",
             "description": "简短描述（英文，不超过100字符）",
             "source_targets": [
                 {"source": "源实体类型", "target": "目标实体类型"}
@@ -207,7 +210,7 @@ class OntologyGenerator:
         )
         
         lang_instruction = get_language_instruction()
-        system_prompt = f"{ONTOLOGY_SYSTEM_PROMPT}\n\n{lang_instruction}\nIMPORTANT: Entity type names MUST be in English PascalCase (e.g., 'PersonEntity', 'MediaOrganization'). Relationship type names MUST be in English UPPER_SNAKE_CASE (e.g., 'WORKS_FOR'). Attribute names MUST be in English snake_case. Only description fields and analysis_summary should use the specified language above."
+        system_prompt = f"{ONTOLOGY_SYSTEM_PROMPT}\n\n{lang_instruction}\nIMPORTANT: Entity type names MUST be in English PascalCase (e.g., 'PersonEntity', 'MediaOrganization'). Relationship type names MUST be in English UPPER_SNAKE_CASE (e.g., 'WORKS_FOR'). Attribute names MUST be in English snake_case. Every entity type and relationship type MUST also have a short 'display_name' written in the specified language above (this is what users see in the graph). Only display_name, description fields and analysis_summary should use the specified language above."
         messages = [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": user_message}
@@ -353,8 +356,10 @@ class OntologyGenerator:
         result["entity_types"] = deduped
 
         # 兜底类型定义
+        generic_labels = build_type_labels(None, None, get_locale())["entity"]
         person_fallback = {
             "name": "Person",
+            "display_name": generic_labels.get("Person", "Person"),
             "description": "Any individual person not fitting other specific person types.",
             "attributes": [
                 {"name": "full_name", "type": "text", "description": "Full name of the person"},
@@ -365,6 +370,7 @@ class OntologyGenerator:
         
         organization_fallback = {
             "name": "Organization",
+            "display_name": generic_labels.get("Organization", "Organization"),
             "description": "Any organization not fitting other specific organization types.",
             "attributes": [
                 {"name": "org_name", "type": "text", "description": "Name of the organization"},

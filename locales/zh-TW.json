@@ -122,7 +122,14 @@
     "creating": "建立中...",
     "enterEnvSetup": "進入環境搭建",
     "createSimulationFailed": "建立模擬失敗: {error}",
-    "createSimulationException": "建立模擬異常: {error}"
+    "createSimulationException": "建立模擬異常: {error}",
+    "entityBadge": "實體",
+    "relationBadge": "關係",
+    "attributes": "屬性",
+    "examples": "範例",
+    "connections": "連結",
+    "generatedEntityTypes": "已生成的實體類型",
+    "generatedRelationTypes": "已生成的關係類型"
   },
   "step2": {
     "simInstanceInit": "模擬實例初始化",
@@ -335,7 +342,24 @@
     "graphDataLoading": "圖譜數據載入中...",
     "waitingOntology": "等待本體生成...",
     "toggleMaximize": "最大化/還原",
-    "closeHint": "關閉提示"
+    "closeHint": "關閉提示",
+    "entityTypes": "實體類型",
+    "unknown": "未知",
+    "name": "名稱",
+    "uuid": "UUID",
+    "created": "建立時間",
+    "fact": "事實",
+    "type": "類型",
+    "label": "標籤",
+    "validFrom": "生效時間",
+    "properties": "屬性",
+    "summary": "摘要",
+    "labels": "類型標籤",
+    "episodes": "來源片段",
+    "selfRelations": "自身關係",
+    "itemCount": "{count} 項",
+    "showEdgeLabels": "顯示關係標籤",
+    "none": "無"
   },
   "graphiti": {
     "noEmbeddingSupport": "圖譜建構需要 embedding 支援，請改用 Gemini、OpenAI 或其他提供 embedding 端點的供應商。（目前選擇：{provider}）",
