@@ -744,7 +744,8 @@
     "readingGraphEntities": "Reading Graph Entities",
     "generatingProfiles": "Generating AI Agent Profiles",
     "generatingSimConfig": "Generating Simulation Config",
-    "preparingScripts": "Preparing Scripts"
+    "preparingScripts": "Preparing Scripts",
+    "taskInterrupted": "The service restarted and this task was interrupted. Please run it again."
   },
   "log": {
     "preparingGoBack": "Preparing to return to Step 2, closing simulation...",

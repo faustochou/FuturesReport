@@ -36,6 +36,48 @@ def allowed_file(filename: str) -> bool:
 
 # ============== 项目管理接口 ==============
 
+def _reset_graph_state(project) -> None:
+    """把项目退回「本体已生成、尚未建图」的状态（embedding_provider/model 是
+    graph_id 的附属 metadata，graph_id 清空时必须一起清空）。"""
+    project.status = ProjectStatus.ONTOLOGY_GENERATED
+    project.graph_id = None
+    project.graph_build_task_id = None
+    project.error = None
+    project.embedding_provider = None
+    project.embedding_model = None
+
+
+def _recover_orphaned_build(project) -> bool:
+    """建图任务只存在于后端进程的内存（TaskManager）里。服务重新部署/重启后，
+    状态还停在 graph_building 的项目已经没有任何任务在跑，前端会对一个不存在的
+    task 无限轮询，重新建图又会被「正在构建中」挡下，项目就此卡死。
+
+    侦测到这种孤儿状态时：删掉建了一半的图谱，把项目退回「本体已生成」——
+    前端载入项目时看到这个状态会自动重新开始建图。回传是否做了修复。
+    """
+    if project.status != ProjectStatus.GRAPH_BUILDING:
+        return False
+    task_id = project.graph_build_task_id
+    task = TaskManager().get_task(task_id) if task_id else None
+    # 重启时 TaskManager 会把中断的任务标成 failed（见 _load_all_tasks），所以
+    # 「任务不存在」和「任务已不在执行」都算孤儿；正常结束的建图线程会自己把项目
+    # 改成 graph_completed / failed，不会停在 graph_building。
+    if task is not None and task.status in (TaskStatus.PENDING, TaskStatus.PROCESSING):
+        return False
+
+    logger.warning(
+        f"项目 {project.project_id} 的建图任务 {task_id} 已不存在（服务可能重启过），重置为可重新建图"
+    )
+    if project.graph_id:
+        try:
+            delete_graph_by_id(project.graph_id)
+        except Exception as exc:
+            logger.warning(f"清除未完成的图谱 {project.graph_id} 失败（忽略）：{redact_secrets(str(exc))}")
+    _reset_graph_state(project)
+    ProjectManager.save_project(project)
+    return True
+
+
 @graph_bp.route('/project/<project_id>', methods=['GET'])
 def get_project(project_id: str):
     """
@@ -48,6 +90,8 @@ def get_project(project_id: str):
             "success": False,
             "error": t('api.projectNotFound', id=project_id)
         }), 404
+
+    _recover_orphaned_build(project)
 
     return jsonify({
         "success": True,
@@ -272,8 +316,8 @@ def build_graph():
         {
             "project_id": "proj_xxxx",  // 必填，来自接口1
             "graph_name": "图谱名称",    // 可选
-            "chunk_size": 500,          // 可选，默认500
-            "chunk_overlap": 50         // 可选，默认50
+            "chunk_size": 2000,         // 可选，默认2000
+            "chunk_overlap": 200        // 可选，默认200
         }
 
     返回：
@@ -319,6 +363,8 @@ def build_graph():
                 "error": t('api.ontologyNotGenerated')
             }), 400
         
+        _recover_orphaned_build(project)
+
         if project.status == ProjectStatus.GRAPH_BUILDING and not force:
             return jsonify({
                 "success": False,
@@ -330,17 +376,14 @@ def build_graph():
         # metadata，graph_id 清空时必须一起清空，否则会有旧 graph_id 的 embedding
         # 供应商残留在没有对应 graph_id 的项目记录上）
         if force and project.status in [ProjectStatus.GRAPH_BUILDING, ProjectStatus.FAILED, ProjectStatus.GRAPH_COMPLETED]:
-            project.status = ProjectStatus.ONTOLOGY_GENERATED
-            project.graph_id = None
-            project.graph_build_task_id = None
-            project.error = None
-            project.embedding_provider = None
-            project.embedding_model = None
+            _reset_graph_state(project)
         
         # 获取配置
         graph_name = data.get('graph_name', project.name or 'Futures Report Graph')
-        chunk_size = data.get('chunk_size', project.chunk_size or Config.DEFAULT_CHUNK_SIZE)
-        chunk_overlap = data.get('chunk_overlap', project.chunk_overlap or Config.DEFAULT_CHUNK_OVERLAP)
+        # 只有请求明确指定时才用自订值；不沿用项目里存的旧值（旧项目存的是
+        # 已淘汰的 500 字预设，沿用会让重新建图仍然切出上千块）。
+        chunk_size = data.get('chunk_size') or Config.DEFAULT_CHUNK_SIZE
+        chunk_overlap = data.get('chunk_overlap') or Config.DEFAULT_CHUNK_OVERLAP
         
         # 更新项目配置
         project.chunk_size = chunk_size

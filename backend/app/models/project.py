@@ -53,8 +53,8 @@ class Project:
     
     # 配置
     simulation_requirement: Optional[str] = None
-    chunk_size: int = 500
-    chunk_overlap: int = 50
+    chunk_size: int = 2000
+    chunk_overlap: int = 200
     
     # 错误信息
     error: Optional[str] = None
@@ -103,8 +103,8 @@ class Project:
             embedding_provider=data.get('embedding_provider'),
             embedding_model=data.get('embedding_model'),
             simulation_requirement=data.get('simulation_requirement'),
-            chunk_size=data.get('chunk_size', 500),
-            chunk_overlap=data.get('chunk_overlap', 50),
+            chunk_size=data.get('chunk_size', 2000),
+            chunk_overlap=data.get('chunk_overlap', 200),
             error=data.get('error')
         )
 

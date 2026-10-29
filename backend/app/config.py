@@ -67,8 +67,12 @@ class Config:
     ALLOWED_EXTENSIONS = {'pdf', 'md', 'txt', 'markdown'}
     
     # 文本处理配置
-    DEFAULT_CHUNK_SIZE = 500  # 默认切块大小
-    DEFAULT_CHUNK_OVERLAP = 50  # 默认重叠大小
+    # 默认切块大小。每个 chunk 都是一次完整的 Graphiti 抽取（实体抽取、去重、
+    # 关系抽取、关系去重、摘要，十来次 LLM 调用），500 字的旧值让一份长文件切出
+    # 上千块（实测 1019 块、每块约 23 秒 ≈ 6.5 小时）。2000 字让块数降为约 1/4，
+    # 同时仍远低于模型上下文上限，抽取品质不受影响。
+    DEFAULT_CHUNK_SIZE = 2000
+    DEFAULT_CHUNK_OVERLAP = 200  # 默认重叠大小
     
     # OASIS模拟配置
     OASIS_DEFAULT_MAX_ROUNDS = int(os.environ.get('OASIS_DEFAULT_MAX_ROUNDS', '10'))

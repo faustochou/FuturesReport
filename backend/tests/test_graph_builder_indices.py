@@ -48,27 +48,33 @@ class _FakeEpisode:
         self.uuid = uuid
 
 
-class _FakeEpisodeResult:
-    def __init__(self, uuid: str):
-        self.episode = _FakeEpisode(uuid)
+class _FakeBulkResult:
+    def __init__(self, uuids: List[str]):
+        self.episodes = [_FakeEpisode(u) for u in uuids]
+
+
+class _FakeDriver:
+    async def close(self):
+        pass
 
 
 class _FakeGraphiti:
     """Stands in for a real Graphiti instance. Records every
-    build_indices_and_constraints()/add_episode() call (tagged with which
+    build_indices_and_constraints()/add_episode_bulk() call (tagged with which
     graph_id this fake instance was built for) into a shared list, so the
     test can assert on call order/count without touching a real FalkorDB."""
 
     def __init__(self, graph_id: str, calls: List[Tuple[str, str]]):
         self._graph_id = graph_id
         self._calls = calls
+        self.driver = _FakeDriver()
 
     async def build_indices_and_constraints(self):
         self._calls.append(("build_indices", self._graph_id))
 
-    async def add_episode(self, **kwargs):
-        self._calls.append(("add_episode", self._graph_id))
-        return _FakeEpisodeResult(uuid=f"episode-{self._graph_id}-{len(self._calls)}")
+    async def add_episode_bulk(self, raw_episodes, **kwargs):
+        self._calls.append(("add_episode_bulk", self._graph_id))
+        return _FakeBulkResult([f"episode-{self._graph_id}-{ep.name}" for ep in raw_episodes])
 
 
 @pytest.fixture

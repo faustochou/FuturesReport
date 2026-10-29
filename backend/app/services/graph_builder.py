@@ -12,6 +12,8 @@ from dataclasses import dataclass
 
 from falkordb.asyncio import FalkorDB
 from graphiti_core.driver.falkordb_driver import FalkorDriver
+from graphiti_core.nodes import EpisodeType
+from graphiti_core.utils.bulk_utils import RawEpisode
 from redis.exceptions import ConnectionError as RedisConnectionError, TimeoutError as RedisTimeoutError
 
 from ..models.task import TaskManager, TaskStatus
@@ -35,6 +37,16 @@ from .graphiti_factory import (
 from .graphiti_ontology import convert_ontology
 
 logger = get_logger('futuresreport.graph_builder')
+
+# 每次 add_episode_bulk() 一起送進 Graphiti 的 chunk 數。Graphiti 會在一批之內
+# 並行抽取（受 LLM_CONCURRENCY_LIMIT / max_coroutines 限制），並在批內與既有
+# 圖譜之間做實體與關係去重；逐塊 add_episode() 則完全序列化。批次太大會讓單次
+# 呼叫很久才回報一次進度、失敗時重做的範圍也大，10 是兩者的折衷。
+GRAPH_BULK_BATCH_SIZE = max(1, int(os.environ.get("GRAPH_BULK_BATCH_SIZE", "10")))
+# 單一批次的最長處理時間（秒）。LLM 請求本身已有逾時（graphiti_factory），這是
+# 最後一道保險：任何未預期的卡住都會在這個時間後變成明確的失敗，而不是讓建圖
+# 任務永遠停在某個百分比。
+GRAPH_BULK_BATCH_TIMEOUT = int(os.environ.get("GRAPH_BULK_BATCH_TIMEOUT", "1800"))
 
 # 原本這裡有一個進程級旗標 `_indices_built`，假設「FalkorDB 的索引是 label 級的，
 # 跨所有 group_id 共用」，只在進程生命週期內成功建過一次索引就永遠跳過。這個假設
@@ -222,11 +234,14 @@ class GraphBuilderService:
         batch_size: int = 3,
         progress_callback: Optional[Callable] = None
     ) -> List[str]:
-        """逐个 chunk 调用 add_episode()，返回所有 episode 的 uuid 列表。
+        """以 Graphiti add_episode_bulk() 分批写入所有 chunk，返回 episode uuid 列表。
 
-        batch_size 参数保留是为了不打破既有调用签名，但 Graphiti 的 add_episode()
-        是逐条处理的（没有 Zep 那种批量提交 API），这里内部仍是一个个调用，
-        只是保留同样的「进度分批播报」节奏。
+        每批 GRAPH_BULK_BATCH_SIZE 个 chunk：批内并行抽取（逐块 add_episode()
+        是完全序列化的，一份长文件要跑好几个小时），批与批之间依序执行，
+        后一批的去重能看到前一批写入的实体。每批完成后回报一次进度。
+
+        batch_size 参数保留是为了不打破既有调用签名，实际批次大小由
+        GRAPH_BULK_BATCH_SIZE 决定。
         """
         if ontology is not None and not hasattr(self, '_entity_types'):
             self.set_ontology(graph_id, ontology)
@@ -255,34 +270,55 @@ class GraphBuilderService:
                 # 记 debug 日志即可，不影响本次建图继续往下走。
                 logger.debug(f"build_indices_and_constraints failed (non-fatal, continuing): {redact_secrets(str(e))}")
 
-            for i, chunk in enumerate(chunks):
-                try:
-                    result = await graphiti.add_episode(
-                        name=f"{graph_id}_chunk_{i}",
-                        episode_body=chunk,
-                        source_description="Futures Report document chunk",
-                        reference_time=datetime.now(timezone.utc),
-                        group_id=graph_id,
-                        entity_types=entity_types or None,
-                        edge_types=edge_types or None,
-                        edge_type_map=edge_type_map or None,
-                    )
-                    episode_uuids.append(result.episode.uuid)
-                except (RedisConnectionError, RedisTimeoutError):
-                    raise
-                except Exception as e:
-                    if progress_callback:
-                        progress_callback(
-                            t('progress.batchFailed', batch=i + 1, error=redact_secrets(str(e))), 0
+            try:
+                for start in range(0, total_chunks, GRAPH_BULK_BATCH_SIZE):
+                    batch = chunks[start:start + GRAPH_BULK_BATCH_SIZE]
+                    batch_no = start // GRAPH_BULK_BATCH_SIZE + 1
+                    reference_time = datetime.now(timezone.utc)
+                    raw_episodes = [
+                        RawEpisode(
+                            name=f"{graph_id}_chunk_{start + offset}",
+                            content=chunk,
+                            source_description="Futures Report document chunk",
+                            source=EpisodeType.text,
+                            reference_time=reference_time,
                         )
-                    raise RuntimeError(t('api.llmExtractionError', detail=redact_secrets(str(e)))) from e
+                        for offset, chunk in enumerate(batch)
+                    ]
+                    try:
+                        result = await asyncio.wait_for(
+                            graphiti.add_episode_bulk(
+                                raw_episodes,
+                                group_id=graph_id,
+                                entity_types=entity_types or None,
+                                edge_types=edge_types or None,
+                                edge_type_map=edge_type_map or None,
+                            ),
+                            timeout=GRAPH_BULK_BATCH_TIMEOUT,
+                        )
+                        episode_uuids.extend(ep.uuid for ep in result.episodes)
+                    except (RedisConnectionError, RedisTimeoutError):
+                        raise
+                    except Exception as e:
+                        detail = redact_secrets(str(e)) or e.__class__.__name__
+                        if progress_callback:
+                            progress_callback(
+                                t('progress.batchFailed', batch=batch_no, error=detail), 0
+                            )
+                        raise RuntimeError(t('api.llmExtractionError', detail=detail)) from e
 
-                if progress_callback:
-                    progress = (i + 1) / total_chunks
-                    progress_callback(
-                        t('progress.sendingBatch', current=i + 1, total=total_chunks, chunks=1),
-                        progress
-                    )
+                    if progress_callback:
+                        done = start + len(batch)
+                        progress_callback(
+                            t('progress.sendingBatch', current=done, total=total_chunks, chunks=len(batch)),
+                            done / total_chunks
+                        )
+            finally:
+                # 建圖用的 driver 只活在這次 asyncio.run() 裡，結束時一併關閉連線池。
+                try:
+                    await graphiti.driver.close()
+                except Exception as exc:
+                    logger.debug(f"closing graph driver failed (ignored): {exc}")
 
         try:
             asyncio.run(_add_all())
@@ -298,7 +334,7 @@ class GraphBuilderService:
         # 呼叫 fetch_all_nodes + fetch_all_edges——同一个 driver 的底层 async
         # redis 连线绑在建立时的 event loop 上，分开呼叫会在第二次触发
         # "Event loop is closed"（Stage 5 端到端测试对真实 FalkorDB 实测到的）。
-        nodes, edges = fetch_nodes_and_edges(graphiti.driver, graph_id)
+        nodes, edges = fetch_nodes_and_edges(graphiti.driver, graph_id, close_driver=True)
 
         entity_types = set()
         for node in nodes:
@@ -319,7 +355,7 @@ class GraphBuilderService:
         enforce_embedding_consistency(self.user_llm_config, graph_id)
 
         graphiti = build_graphiti(self.user_llm_config, graph_id)
-        nodes, edges = fetch_nodes_and_edges(graphiti.driver, graph_id)
+        nodes, edges = fetch_nodes_and_edges(graphiti.driver, graph_id, close_driver=True)
 
         node_map = {}
         for node in nodes:
@@ -417,6 +453,9 @@ def delete_graph_by_id(graph_id: str) -> None:
     )
 
     async def _clear():
-        await driver.execute_query("MATCH (n) DETACH DELETE n")
+        try:
+            await driver.execute_query("MATCH (n) DETACH DELETE n")
+        finally:
+            await driver.close()
 
     asyncio.run(_clear())

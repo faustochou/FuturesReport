@@ -744,7 +744,8 @@
     "readingGraphEntities": "读取图谱实体",
     "generatingProfiles": "生成AI智能体人设",
     "generatingSimConfig": "生成模拟配置",
-    "preparingScripts": "准备模拟脚本"
+    "preparingScripts": "准备模拟脚本",
+    "taskInterrupted": "服务重新启动，这个任务已中断，请重新执行。"
   },
   "log": {
     "preparingGoBack": "准备返回 Step 2，正在关闭模拟...",

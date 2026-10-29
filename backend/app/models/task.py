@@ -129,7 +129,14 @@ class TaskManager:
             return None
     
     def _load_all_tasks(self):
-        """启动时从磁盘恢复任务状态"""
+        """启动时从磁盘恢复任务状态。
+
+        所有任务都在本进程的后台线程里执行，进程重启后线程已不存在：磁盘上仍是
+        pending/processing 的任务不可能再有进展。原样恢复会让前端对它无限轮询
+        （「建图停在 23%」），所以这里一律标记为失败并写回磁盘，让前端拿到明确的
+        结束状态。单例在本进程第一次使用 TaskManager 时才初始化，那时本进程还没
+        建立任何任务，所以这里看到的 pending/processing 必然来自上一个进程。
+        """
         self._ensure_tasks_dir()
         try:
             for fname in os.listdir(self.TASKS_DIR):
@@ -137,6 +144,12 @@ class TaskManager:
                     tid = fname[:-5]
                     task = self._load_task_from_disk(tid)
                     if task:
+                        if task.status in (TaskStatus.PENDING, TaskStatus.PROCESSING):
+                            task.status = TaskStatus.FAILED
+                            task.message = t('progress.taskInterrupted')
+                            task.error = task.message
+                            task.updated_at = datetime.now()
+                            self._save_task_to_disk(task)
                         self._tasks[tid] = task
         except Exception:
             pass

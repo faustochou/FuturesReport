@@ -318,8 +318,15 @@ def fetch_nodes_and_edges(
     max_items: int = _MAX_NODES,
     max_retries: int = _DEFAULT_MAX_RETRIES,
     retry_delay: float = _DEFAULT_RETRY_DELAY,
+    close_driver: bool = False,
 ) -> tuple[PagedResult, PagedResult]:
     """在同一個 event loop 內依序取得 nodes 與 edges。
+
+    close_driver=True：查完後在同一個 loop 裡關閉 driver 的連線池。呼叫端若是
+    「每次請求現建一個 driver、用完即丟」（例如 /api/graph/data 每 10 秒被前端
+    輪詢一次），一定要開這個參數，否則每次輪詢都會遺留一組 FalkorDB 連線
+    （實測一個建圖過程累積了 51 條沒關閉的連線）。連線綁在 event loop 上，
+    必須在 asyncio.run() 結束前關，所以由這裡負責、不能交給呼叫端事後關。
 
     Stage 5 端到端測試對著真實 FalkorDB 實測發現：FalkorDB 的 async redis
     連線會綁定在建立當下的 event loop 上；如果分別呼叫 fetch_all_nodes() 和
@@ -330,12 +337,19 @@ def fetch_nodes_and_edges(
     fetch_all_edges。
     """
     async def _both() -> tuple[list[EntityNode], list[EntityEdge]]:
-        nodes = await _fetch_all_nodes_async(
-            driver, graph_id, node_page_size, max_items, max_retries, retry_delay
-        )
-        edges = await _fetch_all_edges_async(
-            driver, graph_id, edge_page_size, max_retries, retry_delay
-        )
-        return nodes, edges
+        try:
+            nodes = await _fetch_all_nodes_async(
+                driver, graph_id, node_page_size, max_items, max_retries, retry_delay
+            )
+            edges = await _fetch_all_edges_async(
+                driver, graph_id, edge_page_size, max_retries, retry_delay
+            )
+            return nodes, edges
+        finally:
+            if close_driver:
+                try:
+                    await driver.close()
+                except Exception as exc:  # 關閉失敗不影響已取得的資料
+                    logger.debug(f"closing graph driver failed (ignored): {exc}")
 
     return asyncio.run(_both())

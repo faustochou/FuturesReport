@@ -33,7 +33,10 @@ os.environ.setdefault("GRAPHITI_TELEMETRY_ENABLED", "false")
 from pydantic import BaseModel
 
 from falkordb.asyncio import FalkorDB
+from google import genai
+from google.genai import types as genai_types
 from graphiti_core import Graphiti
+from openai import AsyncOpenAI
 from graphiti_core.cross_encoder.client import CrossEncoderClient
 from graphiti_core.driver.falkordb_driver import FalkorDriver
 from graphiti_core.embedder.client import EmbedderClient
@@ -154,6 +157,15 @@ FALKORDB_SOCKET_TIMEOUT = 30
 # extract_edges_max_tokens=16384，不受這裡影響。
 GEMINI_LLM_MAX_TOKENS = 65536
 
+# 單次 LLM / embedding HTTP 請求的逾時（秒）。google-genai 預設「不設逾時」：
+# 2026-10-29 正式環境實測，一次建圖在第 107 塊時某個 Gemini 請求再也沒有回應，
+# 整個建圖任務就此無聲卡住一個多小時、CPU 閒置、沒有任何例外。設了逾時之後，
+# 卡住的請求會變成例外，交給 graphiti-core 的重試（GeminiClient 最多 2 次）與
+# 下面的 HTTP 層重試處理。OpenAI SDK 預設是 600 秒，這裡一併縮短成同一個值。
+LLM_REQUEST_TIMEOUT_SECONDS = int(os.environ.get("GRAPHITI_LLM_TIMEOUT_SECONDS", "180"))
+# HTTP 層對暫時性錯誤（429 / 5xx）的自動重試次數（含第一次）。
+LLM_HTTP_RETRY_ATTEMPTS = 4
+
 
 class UnsupportedProviderError(ValueError):
     """使用者選擇的供應商不支援圖譜建構所需的 embedding。"""
@@ -266,8 +278,8 @@ class _DimensionAwareOpenAIEmbedder(OpenAIEmbedder):
       截斷（`[:embedding_dim]`），但截斷後再做 L2 重新正規化。
     """
 
-    def __init__(self, config: OpenAIEmbedderConfig, use_server_side_dim: bool):
-        super().__init__(config=config)
+    def __init__(self, config: OpenAIEmbedderConfig, use_server_side_dim: bool, client: Optional[AsyncOpenAI] = None):
+        super().__init__(config=config, client=client)
         self._use_server_side_dim = use_server_side_dim
 
     async def create(self, input_data) -> List[float]:
@@ -330,6 +342,18 @@ def _build_llm_and_embedder(
     """供應商判斷邏輯集中在這裡：gemini 走原生 client，其餘一律走 OpenAI 相容
     generic client。"""
     if provider == "gemini":
+        # LLM 與 embedder 共用一個帶逾時與重試設定的 genai.Client（兩者的
+        # 建構子都官方支援傳入 client；不傳的話各自 new 一個沒有逾時的 client）。
+        gemini_client = genai.Client(
+            api_key=api_key,
+            http_options=genai_types.HttpOptions(
+                timeout=LLM_REQUEST_TIMEOUT_SECONDS * 1000,  # 毫秒
+                retry_options=genai_types.HttpRetryOptions(
+                    attempts=LLM_HTTP_RETRY_ATTEMPTS,
+                    http_status_codes=[408, 429, 500, 502, 503, 504],
+                ),
+            ),
+        )
         llm_client = GeminiClient(
             # small_model=model（而非留空、吃 graphiti-core 內建的 DEFAULT_SMALL_MODEL）：
             # graphiti-core 對 model_size=ModelSize.small 的呼叫（屬性抽取、邊/節點
@@ -340,6 +364,7 @@ def _build_llm_and_embedder(
             # 帳號真正有權限的模型上執行，不依賴函式庫內建、可能過時的預設值。
             config=LLMConfig(api_key=api_key, model=model, small_model=model),
             max_tokens=GEMINI_LLM_MAX_TOKENS,
+            client=gemini_client,
         )
         # GeminiEmbedder（graphiti_core 內建）本來就把 embedding_dim 透過
         # `output_dimensionality` 傳給 embed_content API，是伺服器端處理，
@@ -349,12 +374,21 @@ def _build_llm_and_embedder(
                 api_key=api_key,
                 embedding_model=EMBEDDING_MODEL_MAP["gemini"],
                 embedding_dim=GRAPHITI_EMBEDDING_DIM,
-            )
+            ),
+            client=gemini_client,
         )
         return llm_client, embedder
 
     structured_output_mode = (
         "json_schema" if provider in JSON_SCHEMA_NATIVE_PROVIDERS else "json_object"
+    )
+    # 同 gemini 分支：自己組裝帶逾時/重試的 AsyncOpenAI client 傳進去（LLM 與
+    # embedder 共用），不吃 SDK 預設的 600 秒逾時。
+    openai_client = AsyncOpenAI(
+        api_key=api_key,
+        base_url=base_url or None,
+        timeout=LLM_REQUEST_TIMEOUT_SECONDS,
+        max_retries=LLM_HTTP_RETRY_ATTEMPTS - 1,
     )
     llm_client = OpenAIGenericClient(
         # small_model=model：同 gemini 分支的理由——graphiti-core 對
@@ -365,6 +399,7 @@ def _build_llm_and_embedder(
         # OpenAI 帳號的預設值。
         config=LLMConfig(api_key=api_key, model=model, small_model=model, base_url=base_url),
         structured_output_mode=structured_output_mode,
+        client=openai_client,
     )
     embedding_model = EMBEDDING_MODEL_MAP.get(provider, EMBEDDING_MODEL_MAP["openai"])
     embedder = _DimensionAwareOpenAIEmbedder(
@@ -375,6 +410,7 @@ def _build_llm_and_embedder(
             embedding_dim=GRAPHITI_EMBEDDING_DIM,
         ),
         use_server_side_dim=provider in SERVER_SIDE_DIM_PROVIDERS,
+        client=openai_client,
     )
     return llm_client, embedder
 

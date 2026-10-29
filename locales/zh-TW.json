@@ -744,7 +744,8 @@
     "readingGraphEntities": "讀取圖譜實體",
     "generatingProfiles": "生成AI代理人人設",
     "generatingSimConfig": "生成模擬配置",
-    "preparingScripts": "準備模擬腳本"
+    "preparingScripts": "準備模擬腳本",
+    "taskInterrupted": "服務重新啟動，這個任務已中斷，請重新執行。"
   },
   "log": {
     "preparingGoBack": "準備返回 Step 2，正在關閉模擬...",
