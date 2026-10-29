@@ -26,9 +26,13 @@ import random
 from functools import lru_cache
 from typing import Any, Dict, List, Optional, Tuple
 
+import httpx
 import numpy as np
+from google.genai import errors as genai_errors
+from google.genai import types as genai_types
 from graphiti_core import Graphiti
 from graphiti_core.driver.falkordb_driver import FalkorDriver
+from graphiti_core.embedder.gemini import GeminiEmbedder
 from graphiti_core.llm_client.errors import RateLimitError
 from graphiti_core.nodes import EntityNode, EpisodicNode
 from graphiti_core.prompts import prompt_library
@@ -38,6 +42,16 @@ from graphiti_core.utils.maintenance import dedup_helpers as _dedup_helpers
 from ..utils.logger import get_logger
 
 logger = get_logger('futuresreport.graphiti_batch')
+
+# Dropped/reset connections and similar transport failures. google-genai's own
+# retry only covers HTTP status codes, and graphiti-core's embedder has no retry
+# at all, so one ReadError used to fail a whole build (production, 2026-10-29).
+TRANSIENT_NETWORK_ERRORS = (httpx.TransportError, asyncio.TimeoutError, ConnectionError)
+NETWORK_RETRIES = 4
+
+
+async def _network_backoff(attempt: int) -> None:
+    await asyncio.sleep(min(20.0, 1.0 * 2 ** attempt) + random.uniform(0, 0.5))
 
 # ---------------------------------------------------------------------------
 # MinHash signature cache
@@ -232,6 +246,69 @@ class BatchDedupGraphiti(Graphiti):
 
 
 # ---------------------------------------------------------------------------
+# Gemini embeddings: batched and concurrent
+# ---------------------------------------------------------------------------
+
+class ConcurrentGeminiEmbedder(GeminiEmbedder):
+    """graphiti-core's GeminiEmbedder forces batch_size=1 for gemini-embedding-001
+    (a Vertex AI limit) and then embeds strictly one item after another, so every
+    create_batch() over a few hundred entities/facts became hundreds of sequential
+    HTTP round trips — the slow single-connection phase seen in production
+    (2026-10-29). Here batches of up to `batch_size` go out concurrently; if the
+    API rejects multi-input requests (HTTP 400) we switch to single-item requests,
+    still concurrently, and remember that for the rest of the build."""
+
+    def __init__(self, *args, batch_size: int = 100, max_concurrency: int = 32, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.batch_size = max(1, batch_size)
+        self._max_concurrency = max(1, max_concurrency)
+        self._multi_input_ok = True
+
+    async def _embed(self, contents: List[str]) -> List[List[float]]:
+        for attempt in range(NETWORK_RETRIES + 1):
+            try:
+                result = await self.client.aio.models.embed_content(
+                    model=self.config.embedding_model,
+                    contents=contents,
+                    config=genai_types.EmbedContentConfig(output_dimensionality=self.config.embedding_dim),
+                )
+                break
+            except TRANSIENT_NETWORK_ERRORS as exc:
+                if attempt == NETWORK_RETRIES:
+                    raise
+                logger.warning(f"embedding request failed ({type(exc).__name__}), retrying")
+                await _network_backoff(attempt)
+        vectors = [e.values for e in (result.embeddings or [])]
+        if len(vectors) != len(contents) or not all(vectors):
+            raise ValueError(f"expected {len(contents)} embeddings, got {len(vectors)}")
+        return vectors
+
+    async def create_batch(self, input_data_list: List[str]) -> List[List[float]]:
+        if not input_data_list:
+            return []
+        semaphore = asyncio.Semaphore(self._max_concurrency)
+
+        async def bounded(contents):
+            async with semaphore:
+                return await self._embed(contents)
+
+        if self._multi_input_ok and self.batch_size > 1:
+            chunks = [input_data_list[i:i + self.batch_size]
+                      for i in range(0, len(input_data_list), self.batch_size)]
+            try:
+                results = await asyncio.gather(*[bounded(c) for c in chunks])
+                return [vector for chunk in results for vector in chunk]
+            except genai_errors.ClientError as exc:
+                if getattr(exc, "code", None) != 400:
+                    raise
+                logger.warning(f"multi-input embedding rejected ({exc}); using single-item requests")
+                self._multi_input_ok = False
+
+        results = await asyncio.gather(*[bounded([item]) for item in input_data_list])
+        return [chunk[0] for chunk in results]
+
+
+# ---------------------------------------------------------------------------
 # FalkorDB query throttle
 # ---------------------------------------------------------------------------
 
@@ -366,6 +443,7 @@ def apply_rate_limit_handling(
 
     async def generate_response(messages, *args, **kwargs):
         attempt = 0
+        network_attempt = 0
         while True:
             async with limiter:
                 try:
@@ -375,10 +453,18 @@ def apply_rate_limit_handling(
                     attempt += 1
                     if attempt > max_retries:
                         raise
+                    delay = min(60.0, base_delay * 2 ** (attempt - 1)) + random.uniform(0, 1)
+                except TRANSIENT_NETWORK_ERRORS as exc:
+                    # a dropped connection is not a reason to fail the whole build
+                    if network_attempt >= NETWORK_RETRIES:
+                        raise
+                    logger.warning(f"LLM request failed ({type(exc).__name__}), retrying")
+                    delay = min(20.0, 1.0 * 2 ** network_attempt) + random.uniform(0, 0.5)
+                    network_attempt += 1
                 else:
                     limiter.on_success()
                     return result
-            await asyncio.sleep(min(60.0, base_delay * 2 ** (attempt - 1)) + random.uniform(0, 1))
+            await asyncio.sleep(delay)
 
     llm_client.generate_response = generate_response
     return llm_client

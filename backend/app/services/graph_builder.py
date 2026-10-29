@@ -46,6 +46,23 @@ GRAPH_BULK_BATCH_SIZE = max(1, int(os.environ.get("GRAPH_BULK_BATCH_SIZE", "100"
 # 單一批次的最長處理時間（秒）。LLM 請求本身已有逾時（graphiti_factory），這是
 # 最後一道保險：任何未預期的卡住都會在這個時間後變成明確的失敗，而不是讓建圖
 # 任務永遠停在某個百分比。
+# 第一批刻意小一點：bulk 模式要整批跑完才會寫入實體，100 塊的第一批要跑好幾分鐘，
+# 這段時間圖譜一直是 0 個節點、進度停在 15%，看起來像卡住。先跑一小批讓圖譜
+# 盡早出現，之後再用大批次衝速度。
+GRAPH_FIRST_BATCH_SIZE = max(1, int(os.environ.get("GRAPH_FIRST_BATCH_SIZE", "20")))
+
+
+def _batch_ranges(total: int):
+    """[(start, end), ...]：第一批 GRAPH_FIRST_BATCH_SIZE，其餘 GRAPH_BULK_BATCH_SIZE。"""
+    ranges, start = [], 0
+    first = min(GRAPH_FIRST_BATCH_SIZE, GRAPH_BULK_BATCH_SIZE)
+    while start < total:
+        size = first if start == 0 else GRAPH_BULK_BATCH_SIZE
+        ranges.append((start, min(total, start + size)))
+        start += size
+    return ranges
+
+
 GRAPH_BULK_BATCH_TIMEOUT = int(os.environ.get("GRAPH_BULK_BATCH_TIMEOUT", "1800"))
 
 # 原本這裡有一個進程級旗標 `_indices_built`，假設「FalkorDB 的索引是 label 級的，
@@ -271,9 +288,8 @@ class GraphBuilderService:
                 logger.debug(f"build_indices_and_constraints failed (non-fatal, continuing): {redact_secrets(str(e))}")
 
             try:
-                for start in range(0, total_chunks, GRAPH_BULK_BATCH_SIZE):
-                    batch = chunks[start:start + GRAPH_BULK_BATCH_SIZE]
-                    batch_no = start // GRAPH_BULK_BATCH_SIZE + 1
+                for batch_no, (start, end) in enumerate(_batch_ranges(total_chunks), start=1):
+                    batch = chunks[start:end]
                     reference_time = datetime.now(timezone.utc)
                     raw_episodes = [
                         RawEpisode(

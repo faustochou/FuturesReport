@@ -54,6 +54,7 @@ from .graph_localization import apply_language_directive, graph_language_directi
 from .graphiti_batch import (
     AdaptiveConcurrencyLimiter,
     BatchDedupGraphiti,
+    ConcurrentGeminiEmbedder,
     ThrottledFalkorDriver,
     apply_rate_limit_handling,
 )
@@ -382,7 +383,9 @@ def _build_llm_and_embedder(
         # GeminiEmbedder（graphiti_core 內建）本來就把 embedding_dim 透過
         # `output_dimensionality` 傳給 embed_content API，是伺服器端處理，
         # 不需要在這裡包一層截斷/正規化 wrapper（見條件 1 註解）。
-        embedder = GeminiEmbedder(
+        # graphiti-core 的 GeminiEmbedder 對 gemini-embedding-001 強制一次一筆、逐筆
+        # 依序送出（見 graphiti_batch.ConcurrentGeminiEmbedder），改用批次 + 並行版本。
+        embedder = ConcurrentGeminiEmbedder(
             config=GeminiEmbedderConfig(
                 api_key=api_key,
                 embedding_model=EMBEDDING_MODEL_MAP["gemini"],

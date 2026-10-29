@@ -185,3 +185,142 @@ def test_minhash_cache_matches_original_and_is_installed():
         shingles = dedup_helpers._shingles(name)
         assert gbatch._minhash_signature(shingles) == gbatch._original_minhash_signature(shingles)
         assert gbatch._minhash_signature(list(shingles)) == gbatch._original_minhash_signature(shingles)
+
+
+# ---------------------------------------------------------------------------
+# Gemini embedder: batched + concurrent (graphiti-core sends gemini-embedding-001
+# one item at a time, sequentially)
+# ---------------------------------------------------------------------------
+
+class _FakeGenai:
+    def __init__(self, reject_multi=False, error=None):
+        self.calls, self.now, self.peak = [], 0, 0
+        self.reject_multi, self.error = reject_multi, error
+        self.aio = self
+        self.models = self
+
+    async def embed_content(self, model, contents, config):
+        from types import SimpleNamespace
+        from google.genai import errors
+
+        self.calls.append(len(contents))
+        if self.error:
+            raise self.error
+        if self.reject_multi and len(contents) > 1:
+            raise errors.ClientError(400, {"error": {"code": 400, "message": "too many", "status": "INVALID_ARGUMENT"}})
+        self.now += 1
+        self.peak = max(self.peak, self.now)
+        await asyncio.sleep(0.02)
+        self.now -= 1
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=[float(len(c)), 1.0]) for c in contents])
+
+
+def _embedder(fake):
+    from graphiti_core.embedder.gemini import GeminiEmbedderConfig
+    return gbatch.ConcurrentGeminiEmbedder(
+        config=GeminiEmbedderConfig(api_key="k", embedding_model="gemini-embedding-001", embedding_dim=2),
+        client=fake,
+    )
+
+
+def test_embedder_batches_and_runs_batches_concurrently():
+    fake = _FakeGenai()
+    inputs = ["x" * (i % 7 + 1) for i in range(250)]
+    vectors = asyncio.run(_embedder(fake).create_batch(inputs))
+    assert fake.calls == [100, 100, 50]
+    assert fake.peak == 3
+    assert [v[0] for v in vectors] == [float(len(s)) for s in inputs]  # order preserved
+
+
+def test_embedder_falls_back_to_concurrent_single_requests_on_400_and_remembers():
+    fake = _FakeGenai(reject_multi=True)
+    embedder = _embedder(fake)
+    inputs = [f"name {i}" for i in range(50)]
+    vectors = asyncio.run(embedder.create_batch(inputs))
+    assert len(vectors) == 50 and [v[0] for v in vectors] == [float(len(s)) for s in inputs]
+    assert fake.peak > 1                      # concurrent, not one-by-one
+    multi_calls = sum(1 for n in fake.calls if n > 1)
+    asyncio.run(embedder.create_batch(inputs))
+    assert sum(1 for n in fake.calls if n > 1) == multi_calls  # doesn't retry batching
+
+
+def test_embedder_propagates_non_400_errors():
+    fake = _FakeGenai(error=RuntimeError("network down"))
+    with pytest.raises(RuntimeError):
+        asyncio.run(_embedder(fake).create_batch(["a", "b"]))
+
+
+def test_first_batch_is_small_then_full_batches(monkeypatch):
+    from app.services import graph_builder as gb
+
+    monkeypatch.setattr(gb, "GRAPH_FIRST_BATCH_SIZE", 20)
+    monkeypatch.setattr(gb, "GRAPH_BULK_BATCH_SIZE", 100)
+    assert gb._batch_ranges(236) == [(0, 20), (20, 120), (120, 220), (220, 236)]
+    assert gb._batch_ranges(5) == [(0, 5)]
+    assert gb._batch_ranges(0) == []
+
+
+# ---------------------------------------------------------------------------
+# Transient network errors are retried (production build failed on one ReadError)
+# ---------------------------------------------------------------------------
+
+def test_embedder_retries_dropped_connections(monkeypatch):
+    import httpx
+
+    async def no_sleep(attempt):
+        return None
+
+    monkeypatch.setattr(gbatch, "_network_backoff", no_sleep)
+    fake = _FakeGenai()
+    original = fake.embed_content
+    state = {"fails": 2}
+
+    async def flaky(model, contents, config):
+        if state["fails"]:
+            state["fails"] -= 1
+            raise httpx.ReadError("connection dropped")
+        return await original(model, contents, config)
+
+    fake.embed_content = flaky
+    vectors = asyncio.run(_embedder(fake).create_batch(["a", "bb"]))
+    assert [v[0] for v in vectors] == [1.0, 2.0]
+
+
+def test_llm_wrapper_retries_dropped_connections(monkeypatch):
+    import httpx
+
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(gbatch.asyncio, "sleep", lambda *_: real_sleep(0))
+
+    class _Dropping:
+        def __init__(self):
+            self.calls = 0
+
+        async def generate_response(self, messages, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                raise httpx.ReadError("connection dropped")
+            return {"ok": True}
+
+    llm = _Dropping()
+    limiter = gbatch.AdaptiveConcurrencyLimiter(max_limit=8)
+    gbatch.apply_rate_limit_handling(llm, limiter)
+    assert asyncio.run(llm.generate_response([])) == {"ok": True}
+    assert llm.calls == 2
+    assert limiter.limit == 8  # network errors don't shrink concurrency
+
+
+def test_llm_wrapper_gives_up_after_repeated_network_errors(monkeypatch):
+    import httpx
+
+    real_sleep = asyncio.sleep
+    monkeypatch.setattr(gbatch.asyncio, "sleep", lambda *_: real_sleep(0))
+
+    class _Down:
+        async def generate_response(self, messages, **kwargs):
+            raise httpx.ConnectError("unreachable")
+
+    llm = _Down()
+    gbatch.apply_rate_limit_handling(llm, gbatch.AdaptiveConcurrencyLimiter(max_limit=4))
+    with pytest.raises(httpx.ConnectError):
+        asyncio.run(llm.generate_response([]))

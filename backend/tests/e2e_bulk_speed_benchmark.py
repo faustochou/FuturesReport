@@ -39,13 +39,18 @@ from graphiti_core.llm_client.config import LLMConfig  # noqa: E402
 
 from app.services import graph_builder as gb  # noqa: E402
 from app.services.graphiti_batch import (  # noqa: E402
-    AdaptiveConcurrencyLimiter, BatchDedupGraphiti, ThrottledFalkorDriver, apply_rate_limit_handling,
+    AdaptiveConcurrencyLimiter, BatchDedupGraphiti, ConcurrentGeminiEmbedder, ThrottledFalkorDriver,
+    apply_rate_limit_handling,
 )
+from graphiti_core.embedder.gemini import GeminiEmbedder, GeminiEmbedderConfig  # noqa: E402
 from app.services.graphiti_factory import GRAPHITI_EMBEDDING_DIM, NoOpRerankerClient  # noqa: E402
 
 HOST = os.environ.get("FALKORDB_HOST", "localhost")
 PORT = int(os.environ.get("FALKORDB_PORT", "6379"))
 LATENCY = float(os.environ.get("FAKE_LLM_LATENCY", "1.0"))
+# per-request latency of the (simulated) Gemini embedding API; 0 = instant fake embedder
+EMBED_LATENCY = float(os.environ.get("FAKE_EMBED_LATENCY", "0.2"))
+MODES = os.environ.get("BENCH_MODES", "new,old").split(",")
 CHUNKS = int(os.environ.get("BENCH_CHUNKS", "250"))
 FULL, ACRONYM, SHARED = "United Nations Environment Programme", "UNEP", "Alpha Institute"
 ALIASES = {ACRONYM: FULL}
@@ -129,6 +134,24 @@ class FakeLLM(LLMClient):
         return _minimal(schema, schema.get("$defs", {}))
 
 
+class FakeGenaiEmbedClient:
+    """Stands in for google-genai's client.aio.models.embed_content with a fixed
+    per-request latency, so the real Graphiti/our Gemini embedder code paths run."""
+
+    def __init__(self):
+        self.aio = self
+        self.models = self
+        self.requests = 0
+
+    async def embed_content(self, model, contents, config):
+        from types import SimpleNamespace
+        self.requests += 1
+        await asyncio.sleep(EMBED_LATENCY)
+        # Graphiti's search passes create(input_data=[query]) -> contents=[[query]]
+        texts = [" ".join(map(str, c)) if isinstance(c, (list, tuple)) else str(c) for c in contents]
+        return SimpleNamespace(embeddings=[SimpleNamespace(values=FakeEmbedder()._vec(t)) for t in texts])
+
+
 class FakeEmbedder(EmbedderClient):
     """Aliases share a vector; unrelated names are random (near-orthogonal)."""
 
@@ -148,7 +171,9 @@ class FakeEmbedder(EmbedderClient):
 def run(mode):
     graph_id = f"fr_bench_{mode}_{uuid.uuid4().hex[:8]}"
     llm = FakeLLM()
-    new = mode == "new"
+    embed_client = FakeGenaiEmbedClient()
+    # "seqembed": current settings but graphiti-core's sequential Gemini embedder
+    new = mode in ("new", "seqembed")
     max_coroutines = 100 if new else 6
 
     def build(cfg, gid=None):
@@ -161,7 +186,14 @@ def run(mode):
         if new:
             apply_rate_limit_handling(client, AdaptiveConcurrencyLimiter(max_coroutines))
         graphiti_helpers.SEMAPHORE_LIMIT = max_coroutines if new else 20  # graphiti default for old
-        return cls(graph_driver=driver, llm_client=client, embedder=FakeEmbedder(),
+        if EMBED_LATENCY:
+            config = GeminiEmbedderConfig(api_key="fake", embedding_model="gemini-embedding-001",
+                                          embedding_dim=GRAPHITI_EMBEDDING_DIM)
+            emb_cls = ConcurrentGeminiEmbedder if mode == "new" else GeminiEmbedder  # graphiti's: 1 item, sequential
+            embedder = emb_cls(config=config, client=embed_client)
+        else:
+            embedder = FakeEmbedder()
+        return cls(graph_driver=driver, llm_client=client, embedder=embedder,
                    cross_encoder=NoOpRerankerClient(), max_coroutines=max_coroutines)
 
     gb.build_graphiti = build
@@ -183,6 +215,7 @@ def run(mode):
     g.delete()
     return {
         "mode": mode, "seconds": round(elapsed, 1), "llm_calls": llm.calls,
+        "embed_requests": embed_client.requests,
         "llm_rounds_equiv": round(elapsed / LATENCY, 1) if LATENCY else None,
         "episodes": episodes, "relates_to_edges": edges, "alias_nodes(ideal 1)": alias_nodes, "shared_nodes(ideal 1)": shared_nodes,
         f"unique_nodes(ideal {expected_unique})": unique_nodes,
@@ -191,8 +224,18 @@ def run(mode):
 
 if __name__ == "__main__":
     print(f"chunks={CHUNKS} fake latency per LLM call={LATENCY}s")
+    print(f"embedding request latency={EMBED_LATENCY}s modes={MODES}", flush=True)
+    if MODES != ["new", "old"]:
+        for m in MODES:
+            print(run(m), flush=True)
+        print("BENCH OK (custom modes)")
+        raise SystemExit(0)
     new = run("new")
     print(new, flush=True)
+    if "old" not in MODES:
+        assert new["episodes"] == CHUNKS and new["alias_nodes(ideal 1)"] == 1
+        print("BENCH OK (new only)")
+        raise SystemExit(0)
     old = run("old")
     print(old, flush=True)
     print(f"speedup x{old['seconds'] / new['seconds']:.1f}")
