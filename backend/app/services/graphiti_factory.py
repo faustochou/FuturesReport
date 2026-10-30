@@ -57,6 +57,7 @@ from .graphiti_batch import (
     ConcurrentGeminiEmbedder,
     ThrottledFalkorDriver,
     apply_rate_limit_handling,
+    apply_structured_output_guard,
 )
 from ..utils.logger import get_logger
 
@@ -531,6 +532,8 @@ def build_graphiti(user_llm_config: Dict[str, str], graph_id: Optional[str] = No
     graphiti_helpers.SEMAPHORE_LIMIT = max(graphiti_helpers.SEMAPHORE_LIMIT, max_coroutines)
     # 速率限制時自動降並行、退避重試，而不是讓整次建圖失敗（見 graphiti_batch）。
     apply_rate_limit_handling(llm_client, AdaptiveConcurrencyLimiter(max_coroutines))
+    # 結構化輸出驗證：模型回傳 JSON Schema 本身或格式錯誤時，附上更正說明重問（見 graphiti_batch）。
+    apply_structured_output_guard(llm_client)
 
     return BatchDedupGraphiti(
         graph_driver=driver,
