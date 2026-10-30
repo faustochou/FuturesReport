@@ -38,31 +38,14 @@ from .graphiti_ontology import convert_ontology
 
 logger = get_logger('futuresreport.graph_builder')
 
-# 每次 add_episode_bulk() 一起送進 Graphiti 的 chunk 數。一批之內所有 LLM 呼叫
-# 並行（受 GRAPHITI_MAX_COROUTINES 限制），批與批之間依序執行；總時間大致是
-# 「批數 × 每批約 6–7 輪 LLM 往返」，所以批次越大越快。批內的實體去重由
-# graphiti_batch.BatchDedupGraphiti 補上 LLM 比對，品質與小批次相同。
-GRAPH_BULK_BATCH_SIZE = max(1, int(os.environ.get("GRAPH_BULK_BATCH_SIZE", "100")))
+# 每次 add_episode_bulk() 一起送進 Graphiti 的 chunk 數。Graphiti 會在一批之內
+# 並行抽取（受 LLM_CONCURRENCY_LIMIT / max_coroutines 限制），並在批內與既有
+# 圖譜之間做實體與關係去重；逐塊 add_episode() 則完全序列化。批次太大會讓單次
+# 呼叫很久才回報一次進度、失敗時重做的範圍也大，10 是兩者的折衷。
+GRAPH_BULK_BATCH_SIZE = max(1, int(os.environ.get("GRAPH_BULK_BATCH_SIZE", "10")))
 # 單一批次的最長處理時間（秒）。LLM 請求本身已有逾時（graphiti_factory），這是
 # 最後一道保險：任何未預期的卡住都會在這個時間後變成明確的失敗，而不是讓建圖
 # 任務永遠停在某個百分比。
-# 第一批刻意小一點：bulk 模式要整批跑完才會寫入實體，100 塊的第一批要跑好幾分鐘，
-# 這段時間圖譜一直是 0 個節點、進度停在 15%，看起來像卡住。先跑一小批讓圖譜
-# 盡早出現，之後再用大批次衝速度。
-GRAPH_FIRST_BATCH_SIZE = max(1, int(os.environ.get("GRAPH_FIRST_BATCH_SIZE", "20")))
-
-
-def _batch_ranges(total: int):
-    """[(start, end), ...]：第一批 GRAPH_FIRST_BATCH_SIZE，其餘 GRAPH_BULK_BATCH_SIZE。"""
-    ranges, start = [], 0
-    first = min(GRAPH_FIRST_BATCH_SIZE, GRAPH_BULK_BATCH_SIZE)
-    while start < total:
-        size = first if start == 0 else GRAPH_BULK_BATCH_SIZE
-        ranges.append((start, min(total, start + size)))
-        start += size
-    return ranges
-
-
 GRAPH_BULK_BATCH_TIMEOUT = int(os.environ.get("GRAPH_BULK_BATCH_TIMEOUT", "1800"))
 
 # 原本這裡有一個進程級旗標 `_indices_built`，假設「FalkorDB 的索引是 label 級的，
@@ -288,8 +271,9 @@ class GraphBuilderService:
                 logger.debug(f"build_indices_and_constraints failed (non-fatal, continuing): {redact_secrets(str(e))}")
 
             try:
-                for batch_no, (start, end) in enumerate(_batch_ranges(total_chunks), start=1):
-                    batch = chunks[start:end]
+                for start in range(0, total_chunks, GRAPH_BULK_BATCH_SIZE):
+                    batch = chunks[start:start + GRAPH_BULK_BATCH_SIZE]
+                    batch_no = start // GRAPH_BULK_BATCH_SIZE + 1
                     reference_time = datetime.now(timezone.utc)
                     raw_episodes = [
                         RawEpisode(
