@@ -50,6 +50,7 @@ from graphiti_core.prompts.models import Message
 
 from ..utils.locale import get_locale, t
 from .graph_localization import apply_language_directive, graph_language_directive
+from .structured_output_guard import apply_structured_output_guard
 from ..utils.logger import get_logger
 
 logger = get_logger('futuresreport.graphiti_factory')
@@ -322,6 +323,35 @@ class NoOpRerankerClient(CrossEncoderClient):
         return [(passage, 1.0 - i / total) for i, passage in enumerate(passages)]
 
 
+# Qwen 3.5 起的混合推理模型（qwen3.5 / 3.6 / 3.7 / 3.8 的 flash、plus、max）
+# 預設開啟「思考」（阿里雲官方文件；舊的 qwen-plus / qwen-flash 預設關閉）。
+# 2026-10-30 正式環境：qwen3.8-flash 建圖時每個請求都先產生長篇思考、單次呼叫
+# 超過 2 分鐘，第一批 20 塊卡在 15% 動不了；思考 token 也按輸出計費。
+# Graphiti 的抽取/去重是短小的結構化輸出，不需要思考，所以對建圖用的 client
+# 關閉它。「純思考」模型（官方列出的 qwen3.8-2.4t-a95b、名稱含 thinking 的）
+# 不能關閉，送了反而會被拒，所以排除。
+_QWEN_THINKING_ONLY_MARKERS = ("thinking", "2.4t")
+
+
+def _qwen_thinking_can_be_disabled(provider: str, model: str) -> bool:
+    name = (model or "").lower()
+    return provider == "qwen" and not any(marker in name for marker in _QWEN_THINKING_ONLY_MARKERS)
+
+
+def _disable_thinking(openai_client: AsyncOpenAI) -> None:
+    """Make every chat request from this client send enable_thinking=false
+    (DashScope's switch for hybrid-thinking models). Embedding calls are untouched."""
+    completions = openai_client.chat.completions
+    original_create = completions.create
+
+    async def create(*args, **kwargs):
+        extra_body = dict(kwargs.pop("extra_body", None) or {})
+        extra_body.setdefault("enable_thinking", False)
+        return await original_create(*args, extra_body=extra_body, **kwargs)
+
+    completions.create = create
+
+
 def get_llm_concurrency_limit() -> int:
     """讀取 LLM 並發限制環境變數（沿用既有 LLM_CONCURRENCY_LIMIT 慣例），用來覆蓋
     Graphiti 的 SEMAPHORE_LIMIT（見 Graphiti(max_coroutines=...)），不需要自建
@@ -391,6 +421,8 @@ def _build_llm_and_embedder(
         timeout=LLM_REQUEST_TIMEOUT_SECONDS,
         max_retries=LLM_HTTP_RETRY_ATTEMPTS - 1,
     )
+    if _qwen_thinking_can_be_disabled(provider, model):
+        _disable_thinking(openai_client)
     llm_client = OpenAIGenericClient(
         # small_model=model：同 gemini 分支的理由——graphiti-core 對
         # model_size=ModelSize.small 呼叫預設會用它自己寫死的 DEFAULT_SMALL_MODEL
@@ -461,6 +493,8 @@ def build_graphiti(user_llm_config: Dict[str, str], graph_id: Optional[str] = No
     # 圖譜內容（實體名稱、摘要、關係事實）跟著介面語言走：建圖 / 模擬記憶更新的
     # 背景執行緒都已經 set_locale()，這裡取到的就是發起請求的使用者語言。
     apply_language_directive(llm_client, graph_language_directive(get_locale()))
+    # 結構化輸出驗證：模型回傳 JSON Schema 本身或格式錯誤時，附上更正說明重問（見 structured_output_guard）。
+    apply_structured_output_guard(llm_client)
 
     falkor_client = FalkorDB(
         host=os.environ.get("FALKORDB_HOST", DEFAULT_FALKORDB_HOST),
