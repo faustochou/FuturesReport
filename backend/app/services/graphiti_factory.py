@@ -333,6 +333,35 @@ class NoOpRerankerClient(CrossEncoderClient):
         return [(passage, 1.0 - i / total) for i, passage in enumerate(passages)]
 
 
+# Qwen 3.5 起的混合推理模型（qwen3.5 / 3.6 / 3.7 / 3.8 的 flash、plus、max）
+# 預設開啟「思考」（阿里雲官方文件；舊的 qwen-plus / qwen-flash 預設關閉）。
+# 2026-10-30 正式環境：qwen3.8-flash 建圖時每個請求都先產生長篇思考、單次呼叫
+# 超過 2 分鐘，第一批 20 塊卡在 15% 動不了；思考 token 也按輸出計費。
+# Graphiti 的抽取/去重是短小的結構化輸出，不需要思考，所以對建圖用的 client
+# 關閉它。「純思考」模型（官方列出的 qwen3.8-2.4t-a95b、名稱含 thinking 的）
+# 不能關閉，送了反而會被拒，所以排除。
+_QWEN_THINKING_ONLY_MARKERS = ("thinking", "2.4t")
+
+
+def _qwen_thinking_can_be_disabled(provider: str, model: str) -> bool:
+    name = (model or "").lower()
+    return provider == "qwen" and not any(marker in name for marker in _QWEN_THINKING_ONLY_MARKERS)
+
+
+def _disable_thinking(openai_client: AsyncOpenAI) -> None:
+    """Make every chat request from this client send enable_thinking=false
+    (DashScope's switch for hybrid-thinking models). Embedding calls are untouched."""
+    completions = openai_client.chat.completions
+    original_create = completions.create
+
+    async def create(*args, **kwargs):
+        extra_body = dict(kwargs.pop("extra_body", None) or {})
+        extra_body.setdefault("enable_thinking", False)
+        return await original_create(*args, extra_body=extra_body, **kwargs)
+
+    completions.create = create
+
+
 def get_llm_concurrency_limit() -> int:
     """Graphiti 的並行上限（覆蓋 graphiti-core 的 SEMAPHORE_LIMIT，見
     Graphiti(max_coroutines=...)）。用獨立的 GRAPHITI_MAX_COROUTINES，不再沿用
@@ -406,6 +435,8 @@ def _build_llm_and_embedder(
         timeout=LLM_REQUEST_TIMEOUT_SECONDS,
         max_retries=LLM_HTTP_RETRY_ATTEMPTS - 1,
     )
+    if _qwen_thinking_can_be_disabled(provider, model):
+        _disable_thinking(openai_client)
     llm_client = OpenAIGenericClient(
         # small_model=model：同 gemini 分支的理由——graphiti-core 對
         # model_size=ModelSize.small 呼叫預設會用它自己寫死的 DEFAULT_SMALL_MODEL
